@@ -449,8 +449,8 @@ def generate_signals(data, start_date, end_date):
                         del open_positions[ticker]
                         continue
 
-                # Swing trade: exit below EMA mid after 2 days
-                if pos["strategy_type"] == "swing" and days_held >= 2:
+                # Swing trade: exit below EMA mid after 1 day
+                if pos["strategy_type"] == "swing" and days_held >= 1:
                     if pd.notna(current.get("ema_mid")) and price < current["ema_mid"]:
                         signals.append({
                             "date": day_ts, "ticker": ticker, "action": "SELL",

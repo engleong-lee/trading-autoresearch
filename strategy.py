@@ -64,7 +64,7 @@ SR_LOOKBACK = 45             # Days to look back for S/R levels
 SR_MIN_TOUCHES = 2           # Minimum touches to qualify as S/R
 
 # Pattern detection
-PULLBACK_THRESHOLD_PCT = 0.04  # Price within 4% of support = potential entry
+PULLBACK_THRESHOLD_PCT = 0.05  # Price within 4% of support = potential entry
 
 # Candlestick confirmation
 CANDLE_CONFIRM_VIX = 25      # Require candle confirmation when VIX above this

@@ -1,0 +1,14 @@
+Data already cached at /Users/engleong.lee/.cache/autoresearch-trading
+============================================================
+RUNNING ON TEST SET (out-of-sample)
+============================================================
+
+  [TEST]
+  Sharpe Ratio:      9.5822
+  Total Return:      386.18%
+  Max Drawdown:      -3.02%
+  Num Trades:        446
+  Win Rate:          81.2%
+  Avg Hold Days:     2.1
+  Profit Factor:     13.31
+  Avg PnL/Trade:     $866.71

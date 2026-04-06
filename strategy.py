@@ -48,7 +48,7 @@ ENTRY_OFFSET_PCT = 0.003
 TP_OFFSET_PCT = 0.003
 
 # Risk per trade
-RISK_PCT = 0.01  # 1% of capital
+RISK_PCT = 0.005  # 0.5% of capital
 
 # Market regime filter
 VIX_HIGH_THRESHOLD = 30      # Above this = cautious (smaller positions)
@@ -62,7 +62,7 @@ SR_LOOKBACK = 60             # Days to look back for S/R levels
 SR_MIN_TOUCHES = 2           # Minimum touches to qualify as S/R
 
 # Pattern detection
-PULLBACK_THRESHOLD_PCT = 0.05  # Price within 5% of support = potential entry
+PULLBACK_THRESHOLD_PCT = 0.07  # Price within 7% of support = potential entry
 
 # Candlestick confirmation
 CANDLE_CONFIRM_VIX = 25      # Require candle confirmation when VIX above this

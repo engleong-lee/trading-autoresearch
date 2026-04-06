@@ -50,7 +50,7 @@ ENTRY_OFFSET_PCT = 0.0
 TP_OFFSET_PCT = 0.004
 
 # Risk per trade
-RISK_PCT = 0.005  # 0.5% of capital
+RISK_PCT = 0.007  # 0.5% of capital
 
 # Market regime filter
 VIX_HIGH_THRESHOLD = 30      # Above this = cautious (smaller positions)

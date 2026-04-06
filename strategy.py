@@ -60,7 +60,7 @@ VIX_LOW_THRESHOLD = 15       # Below this = aggressive (normal/larger positions)
 INITIAL_CAPITAL = 100_000.0
 
 # Support/Resistance lookback
-SR_LOOKBACK = 45             # Days to look back for S/R levels
+SR_LOOKBACK = 60             # Days to look back for S/R levels
 SR_MIN_TOUCHES = 2           # Minimum touches to qualify as S/R
 
 # Pattern detection

@@ -51,6 +51,7 @@ TP_OFFSET_PCT = 0.003
 
 # Risk per trade
 RISK_PCT = 0.005  # 0.5% of capital
+MAX_POSITION_SHARES = 600    # Cap shares per trade
 
 # Market regime filter
 VIX_HIGH_THRESHOLD = 30      # Above this = cautious (smaller positions)
@@ -573,6 +574,7 @@ def generate_signals(data, start_date, end_date):
                 position_size = int(risk_amount / risk)
                 if position_size <= 0:
                     continue
+                position_size = min(position_size, MAX_POSITION_SHARES)
 
                 # Confirmation filters
                 # RSI not overbought

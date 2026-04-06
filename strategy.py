@@ -36,6 +36,8 @@ ATR_STOP_MULTIPLIER = 1.0   # Stop = support - ATR * multiplier
 # Swing trading parameters
 SWING_MIN_RR = 2.0           # Minimum reward/risk ratio for swing entries
 SWING_MAX_HOLD_DAYS = 4     # Max hold days for swing trades
+SWING_TRAIL_PROFIT_PCT = 0.03  # Activate trailing stop after this profit %
+SWING_TRAIL_ATR_MULT = 0.8    # Trailing stop distance in ATR units
 
 # Trend trading parameters
 TREND_MIN_RR = 6.0           # Minimum reward/risk for trend initial entry
@@ -446,6 +448,18 @@ def generate_signals(data, start_date, end_date):
                         })
                         del open_positions[ticker]
                         continue
+
+                # Swing trade: trailing stop when profitable
+                if pos["strategy_type"] == "swing":
+                    if price > pos["entry_price"] * (1 + SWING_TRAIL_PROFIT_PCT):
+                        new_stop = max(pos["stop_loss"], price - SWING_TRAIL_ATR_MULT * atr)
+                        if new_stop > pos["stop_loss"]:
+                            pos["stop_loss"] = new_stop
+                            signals.append({
+                                "date": day_ts, "ticker": ticker, "action": "UPDATE_STOP",
+                                "price": price, "stop_loss": new_stop,
+                                "take_profit": None, "position_size": 0,
+                            })
 
                 # Swing trade: check max hold
                 if pos["strategy_type"] == "swing" and days_held >= SWING_MAX_HOLD_DAYS:

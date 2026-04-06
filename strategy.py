@@ -113,6 +113,18 @@ def compute_indicators(df):
     df["vol_ma"] = df["Volume"].rolling(20).mean()
     df["vol_ratio"] = df["Volume"] / df["vol_ma"].replace(0, np.nan)
 
+    # ADX (14-period) for trend strength
+    plus_dm = df["High"].diff()
+    minus_dm = -df["Low"].diff()
+    plus_dm = plus_dm.where((plus_dm > minus_dm) & (plus_dm > 0), 0.0)
+    minus_dm = minus_dm.where((minus_dm > plus_dm) & (minus_dm > 0), 0.0)
+    tr = true_range  # reuse from ATR calc above
+    atr14 = tr.rolling(14).mean()
+    plus_di = 100 * (plus_dm.rolling(14).mean() / atr14.replace(0, np.nan))
+    minus_di = 100 * (minus_dm.rolling(14).mean() / atr14.replace(0, np.nan))
+    dx = 100 * ((plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan))
+    df["adx"] = dx.rolling(14).mean()
+
     return df
 
 
@@ -358,6 +370,11 @@ def generate_signals(data, start_date, end_date):
             # ── FILTER: skip downtrends ──
             trend = detect_trend(hist)
             if trend == "downtrend":
+                continue
+
+            # ── FILTER: skip very weak trend (ADX < 15) ──
+            adx_val = current.get("adx", 25)
+            if pd.notna(adx_val) and adx_val < 15:
                 continue
 
             # ── FILTER: skip if VIX too high ──

@@ -36,7 +36,7 @@ ATR_STOP_MULTIPLIER = 1.0   # Stop = support - ATR * multiplier
 # Swing trading parameters
 SWING_MIN_RR = 1.5           # Minimum reward/risk ratio for swing entries
 SWING_MAX_HOLD_DAYS = 5     # Max hold days for swing trades
-SWING_TRAIL_PROFIT_PCT = 0.01  # Activate trailing stop after this profit %
+SWING_TRAIL_PROFIT_PCT = 0.0  # Activate trailing stop after this profit %
 SWING_TRAIL_ATR_MULT = 0.8    # Trailing stop distance in ATR units
 
 # Trend trading parameters
@@ -50,7 +50,7 @@ ENTRY_OFFSET_PCT = 0.0
 TP_OFFSET_PCT = 0.004
 
 # Risk per trade
-RISK_PCT = 0.007  # 0.5% of capital
+RISK_PCT = 0.008  # 0.5% of capital
 
 # Market regime filter
 VIX_HIGH_THRESHOLD = 30      # Above this = cautious (smaller positions)

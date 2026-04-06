@@ -64,6 +64,15 @@ SR_MIN_TOUCHES = 2           # Minimum touches to qualify as S/R
 # Pattern detection
 PULLBACK_THRESHOLD_PCT = 0.05  # Price within 5% of support = potential entry
 
+# Candlestick confirmation
+CANDLE_CONFIRM_VIX = 20      # Require candle confirmation when VIX above this
+CANDLE_BODY_RATIO = 0.35     # Max body/range ratio for hammer/shooting star
+CANDLE_WICK_RATIO = 2.0      # Min long_wick/body ratio for hammer/shooting star
+
+# Earnings avoidance
+EARNINGS_AVOID_ENTRY_DAYS = 5   # Don't enter within N days of earnings
+EARNINGS_EXIT_DAYS = 2          # Exit swing trades N days before earnings
+
 
 # ─────────────────────────────────────────────────────────────
 # INDICATORS
@@ -191,6 +200,95 @@ def _cluster_levels(levels, pct=0.01):
         else:
             clusters.append([level])
     return [np.mean(c) for c in clusters]
+
+
+# ─────────────────────────────────────────────────────────────
+# CANDLESTICK PATTERNS
+# ─────────────────────────────────────────────────────────────
+
+def detect_hammer(row):
+    """Detect hammer pattern (bullish at support). Row is a Series with OHLC."""
+    body = abs(row["Close"] - row["Open"])
+    lower_wick = min(row["Open"], row["Close"]) - row["Low"]
+    upper_wick = row["High"] - max(row["Open"], row["Close"])
+    total_range = row["High"] - row["Low"]
+    if total_range == 0 or body == 0:
+        return False
+    return (lower_wick > CANDLE_WICK_RATIO * body and
+            upper_wick < body * 0.5 and
+            body / total_range < CANDLE_BODY_RATIO)
+
+
+def detect_engulfing_bullish(prev, curr):
+    """Detect bullish engulfing. prev/curr are Series with OHLC."""
+    return (prev["Close"] < prev["Open"] and      # prev is bearish
+            curr["Close"] > curr["Open"] and        # current is bullish
+            curr["Close"] > prev["Open"] and        # current close > prev open
+            curr["Open"] < prev["Close"])            # current open < prev close
+
+
+def detect_strong_bullish(row):
+    """Detect strong bullish candle — large body, minimal tails."""
+    body = row["Close"] - row["Open"]
+    total_range = row["High"] - row["Low"]
+    if total_range == 0:
+        return False
+    return body > 0 and body / total_range > 0.65
+
+
+def has_bullish_confirmation(hist):
+    """Check if the most recent candle shows bullish confirmation."""
+    if len(hist) < 2:
+        return False
+    curr = hist.iloc[-1]
+    prev = hist.iloc[-2]
+    return (detect_hammer(curr) or
+            detect_engulfing_bullish(prev, curr) or
+            detect_strong_bullish(curr))
+
+
+# ─────────────────────────────────────────────────────────────
+# EARNINGS DATE AVOIDANCE
+# ─────────────────────────────────────────────────────────────
+
+# Approximate earnings months: most companies report in Jan, Apr, Jul, Oct
+# Earnings typically fall in weeks 3-4 of these months
+EARNINGS_WINDOWS = {
+    "NVDA": [(2, 21, 28), (5, 22, 29), (8, 21, 28), (11, 20, 27)],
+    "AAPL": [(1, 25, 31), (5, 1, 7), (8, 1, 7), (10, 25, 31)],
+    "AMZN": [(2, 1, 7), (4, 25, 30), (8, 1, 7), (10, 25, 31)],
+    "V":    [(1, 25, 31), (4, 22, 28), (7, 22, 28), (10, 22, 28)],
+    "MA":   [(1, 25, 31), (4, 25, 30), (7, 25, 31), (10, 25, 31)],
+    "AMD":  [(1, 28, 31), (4, 28, 30), (7, 28, 31), (10, 28, 31)],
+    "AVGO": [(3, 7, 14), (6, 12, 19), (9, 5, 12), (12, 7, 14)],
+    "CRWD": [(3, 5, 12), (6, 4, 11), (8, 27, 31), (11, 26, 30)],
+    "VGK":  [],  # ETF, no earnings
+    "INTU":[(2, 20, 27), (5, 20, 27), (8, 22, 29), (11, 19, 26)],
+}
+
+
+def days_to_earnings(ticker, current_date):
+    """
+    Approximate days until next earnings for a ticker.
+    Returns int days, or None if unknown/ETF.
+    """
+    windows = EARNINGS_WINDOWS.get(ticker, [])
+    if not windows:
+        return None
+    current_date = pd.Timestamp(current_date)
+    min_days = None
+    for month, day_start, day_end in windows:
+        # Check current year and next year
+        for year in [current_date.year, current_date.year + 1]:
+            try:
+                earn_start = pd.Timestamp(year=year, month=month, day=day_start)
+                diff = (earn_start - current_date).days
+                if diff >= -2:  # include 2 days after (earnings just happened)
+                    if min_days is None or abs(diff) < abs(min_days):
+                        min_days = diff
+            except ValueError:
+                continue
+    return min_days
 
 
 # ─────────────────────────────────────────────────────────────
@@ -332,6 +430,18 @@ def generate_signals(data, start_date, end_date):
                 pos = open_positions[ticker]
                 days_held = (day_ts - pos["entry_date"]).days
 
+                # Earnings avoidance: exit swing trades before earnings
+                dte = days_to_earnings(ticker, day_ts)
+                if dte is not None and 0 < dte <= EARNINGS_EXIT_DAYS:
+                    if pos["strategy_type"] == "swing":
+                        signals.append({
+                            "date": day_ts, "ticker": ticker, "action": "SELL",
+                            "price": price, "stop_loss": None,
+                            "take_profit": None, "position_size": 0,
+                        })
+                        del open_positions[ticker]
+                        continue
+
                 # Swing trade: check max hold
                 if pos["strategy_type"] == "swing" and days_held >= SWING_MAX_HOLD_DAYS:
                     signals.append({
@@ -383,6 +493,11 @@ def generate_signals(data, start_date, end_date):
 
             # ── FILTER: skip if VIX too high ──
             if vix > VIX_HIGH_THRESHOLD:
+                continue
+
+            # ── FILTER: skip if too close to earnings ──
+            dte = days_to_earnings(ticker, day_ts)
+            if dte is not None and 0 < dte <= EARNINGS_AVOID_ENTRY_DAYS:
                 continue
 
             # ── FIND SUPPORT/RESISTANCE ──
@@ -440,6 +555,11 @@ def generate_signals(data, start_date, end_date):
                 # Volume confirmation (above average)
                 if current["vol_ratio"] < 0.5:
                     continue
+
+                # Candlestick confirmation required in high-VIX regime
+                if vix > CANDLE_CONFIRM_VIX:
+                    if not has_bullish_confirmation(hist):
+                        continue
 
                 signals.append({
                     "date": day_ts,

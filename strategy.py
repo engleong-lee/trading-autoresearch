@@ -65,13 +65,13 @@ SR_MIN_TOUCHES = 2           # Minimum touches to qualify as S/R
 PULLBACK_THRESHOLD_PCT = 0.05  # Price within 5% of support = potential entry
 
 # Candlestick confirmation
-CANDLE_CONFIRM_VIX = 20      # Require candle confirmation when VIX above this
+CANDLE_CONFIRM_VIX = 25      # Require candle confirmation when VIX above this
 CANDLE_BODY_RATIO = 0.35     # Max body/range ratio for hammer/shooting star
 CANDLE_WICK_RATIO = 2.0      # Min long_wick/body ratio for hammer/shooting star
 
 # Earnings avoidance
-EARNINGS_AVOID_ENTRY_DAYS = 5   # Don't enter within N days of earnings
-EARNINGS_EXIT_DAYS = 2          # Exit swing trades N days before earnings
+EARNINGS_AVOID_ENTRY_DAYS = 2   # Don't enter within N days of earnings
+EARNINGS_EXIT_DAYS = 1          # Exit swing trades N days before earnings
 
 
 # ─────────────────────────────────────────────────────────────

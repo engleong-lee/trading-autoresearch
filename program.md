@@ -91,6 +91,16 @@ The strategy uses daily bars. The evaluation uses walk-forward validation across
 - **Max ~15 tunable parameters.** Don't create a 50-parameter monster that overfits.
 - **strategy.py must be self-contained.** Only import numpy and pandas. Do not add new pip dependencies.
 
+## Strategy Identity Constraints (Round 3)
+These rules preserve the original swing/trend trading methodology. The agent MUST NOT violate them:
+- SWING_MAX_HOLD_DAYS must be between 5 and 21. No 2-day scalping.
+- SWING_MIN_RR must be >= 1.5. No low-quality setups.
+- TREND_MIN_RR must be <= 4.0. Trend trading must remain viable, not disabled.
+- PULLBACK_THRESHOLD_PCT must be <= 0.04 (4%). Entries must be near support, not 7% away.
+- RISK_PCT must be between 0.005 and 0.015. No extreme risk values.
+- EMA_FAST must be >= 10. EMA_MID must be >= 20. No ultra-fast EMAs that create noise.
+- The strategy must generate both swing AND trend trades. If trend trades = 0 across all windows, the experiment fails.
+
 ## Anti-Overfitting Guidelines
 
 - The evaluation already uses walk-forward validation with 5 overlapping windows and a consistency penalty.

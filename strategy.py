@@ -451,7 +451,7 @@ def generate_signals(data, start_date, end_date):
 
                 # Move to breakeven after 1% profit
                 if pos["strategy_type"] == "swing" and not pos.get("breakeven_set"):
-                    if price > pos["entry_price"] * 1.01:
+                    if price > pos["entry_price"] * 1.005:
                         pos["breakeven_set"] = True
                         be_stop = pos["entry_price"] * 1.001
                         if be_stop > pos["stop_loss"]:

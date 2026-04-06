@@ -62,7 +62,7 @@ SR_LOOKBACK = 60             # Days to look back for S/R levels
 SR_MIN_TOUCHES = 2           # Minimum touches to qualify as S/R
 
 # Pattern detection
-PULLBACK_THRESHOLD_PCT = 0.02  # Price within 2% of support = potential entry
+PULLBACK_THRESHOLD_PCT = 0.04  # Price within 4% of support = potential entry
 
 
 # ─────────────────────────────────────────────────────────────
@@ -411,8 +411,8 @@ def generate_signals(data, start_date, end_date):
                 if current["rsi"] > 70:
                     continue
 
-                # MACD histogram positive or turning positive
-                if current["macd_hist"] < -0.5 * atr:
+                # MACD histogram not deeply negative
+                if current["macd_hist"] < -1.0 * atr:
                     continue
 
                 # Volume confirmation (above average)

@@ -26,7 +26,7 @@ import pandas as pd
 
 # EMA periods (from the original strategy: 20, 50, 200)
 EMA_FAST = 10
-EMA_MID = 18
+EMA_MID = 20
 EMA_SLOW = 200
 
 # ATR for stop-loss calculation
@@ -34,13 +34,13 @@ ATR_PERIOD = 14
 ATR_STOP_MULTIPLIER = 1.0   # Stop = support - ATR * multiplier
 
 # Swing trading parameters
-SWING_MIN_RR = 1.2           # Minimum reward/risk ratio for swing entries
-SWING_MAX_HOLD_DAYS = 2     # Max hold days for swing trades
+SWING_MIN_RR = 2.0           # Minimum reward/risk ratio for swing entries
+SWING_MAX_HOLD_DAYS = 10     # Max hold days for swing trades
 SWING_TRAIL_PROFIT_PCT = 0.03  # Activate trailing stop after this profit %
 SWING_TRAIL_ATR_MULT = 0.8    # Trailing stop distance in ATR units
 
 # Trend trading parameters
-TREND_MIN_RR = 6.0           # Minimum reward/risk for trend initial entry
+TREND_MIN_RR = 3.0           # Minimum reward/risk for trend initial entry
 TREND_TRAIL_ATR_MULT = 1.5   # Trail stop at N * ATR below recent support
 
 # Entry offset from support (0.3% above support)
@@ -50,8 +50,7 @@ ENTRY_OFFSET_PCT = 0.002
 TP_OFFSET_PCT = 0.004
 
 # Risk per trade
-RISK_PCT = 0.005  # 0.5% of capital
-MAX_POSITION_SHARES = 600    # Cap shares per trade
+RISK_PCT = 0.01   # 1% of capital
 
 # Market regime filter
 VIX_HIGH_THRESHOLD = 30      # Above this = cautious (smaller positions)
@@ -65,7 +64,7 @@ SR_LOOKBACK = 60             # Days to look back for S/R levels
 SR_MIN_TOUCHES = 2           # Minimum touches to qualify as S/R
 
 # Pattern detection
-PULLBACK_THRESHOLD_PCT = 0.07  # Price within 7% of support = potential entry
+PULLBACK_THRESHOLD_PCT = 0.03  # Price within 3% of support = potential entry
 
 # Candlestick confirmation
 CANDLE_CONFIRM_VIX = 25      # Require candle confirmation when VIX above this
@@ -77,8 +76,8 @@ EARNINGS_AVOID_ENTRY_DAYS = 2   # Don't enter within N days of earnings
 EARNINGS_EXIT_DAYS = 1          # Exit swing trades N days before earnings
 
 # Confirmation filters
-RSI_OVERBOUGHT = 999          # Disabled — RSI filter not helpful with short holds
-VOL_RATIO_MIN = 0.3            # Minimum volume ratio for entry
+RSI_OVERBOUGHT = 70            # Skip entry if RSI above this
+VOL_RATIO_MIN = 0.5            # Minimum volume ratio for entry
 MACD_HIST_ATR_MULT = -1.0      # Skip if MACD hist < this * ATR
 
 
@@ -450,18 +449,6 @@ def generate_signals(data, start_date, end_date):
                         del open_positions[ticker]
                         continue
 
-                # Swing trade: exit if close below mid EMA
-                if pos["strategy_type"] == "swing" and days_held >= 1:
-                    ema_val = current.get("ema_mid", price)
-                    if pd.notna(ema_val) and price < ema_val:
-                        signals.append({
-                            "date": day_ts, "ticker": ticker, "action": "SELL",
-                            "price": price, "stop_loss": None,
-                            "take_profit": None, "position_size": 0,
-                        })
-                        del open_positions[ticker]
-                        continue
-
                 # Swing trade: trailing stop when profitable
                 if pos["strategy_type"] == "swing":
                     if price > pos["entry_price"] * (1 + SWING_TRAIL_PROFIT_PCT):
@@ -574,7 +561,6 @@ def generate_signals(data, start_date, end_date):
                 position_size = int(risk_amount / risk)
                 if position_size <= 0:
                     continue
-                position_size = min(position_size, MAX_POSITION_SHARES)
 
                 # Confirmation filters
                 # RSI not overbought

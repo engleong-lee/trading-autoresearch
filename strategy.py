@@ -422,7 +422,7 @@ def generate_signals(data, start_date, end_date):
                     continue  # R/R not good enough
 
                 # Position sizing: risk-adjust based on VIX
-                effective_risk = RISK_PCT * 1.2 if vix < VIX_LOW_THRESHOLD else RISK_PCT
+                effective_risk = RISK_PCT * 1.3 if vix < VIX_LOW_THRESHOLD else RISK_PCT
                 risk_amount = capital * effective_risk
                 position_size = int(risk_amount / risk)
                 if position_size <= 0:

@@ -449,6 +449,19 @@ def generate_signals(data, start_date, end_date):
                         del open_positions[ticker]
                         continue
 
+                # Swing trade: gap-down exit
+                if pos["strategy_type"] == "swing" and days_held >= 1:
+                    if len(hist) >= 2:
+                        gap_pct = (current["Open"] - hist["Close"].iloc[-2]) / hist["Close"].iloc[-2]
+                        if gap_pct < -0.01:
+                            signals.append({
+                                "date": day_ts, "ticker": ticker, "action": "SELL",
+                                "price": price, "stop_loss": None,
+                                "take_profit": None, "position_size": 0,
+                            })
+                            del open_positions[ticker]
+                            continue
+
                 # Swing trade: exit below EMA mid after 1 day
                 if pos["strategy_type"] == "swing" and days_held >= 1:
                     if pd.notna(current.get("ema_mid")) and price < current["ema_mid"]:

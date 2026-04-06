@@ -38,7 +38,7 @@ SWING_MIN_RR = 2.0           # Minimum reward/risk ratio for swing entries
 SWING_MAX_HOLD_DAYS = 4     # Max hold days for swing trades
 
 # Trend trading parameters
-TREND_MIN_RR = 3.0           # Minimum reward/risk for trend initial entry
+TREND_MIN_RR = 6.0           # Minimum reward/risk for trend initial entry
 TREND_TRAIL_ATR_MULT = 1.5   # Trail stop at N * ATR below recent support
 
 # Entry offset from support (0.3% above support)

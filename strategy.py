@@ -47,7 +47,7 @@ TREND_TRAIL_ATR_MULT = 1.5   # Trail stop at N * ATR below recent support
 ENTRY_OFFSET_PCT = 0.002
 
 # Take-profit offset from resistance (0.3% below resistance)
-TP_OFFSET_PCT = 0.003
+TP_OFFSET_PCT = 0.004
 
 # Risk per trade
 RISK_PCT = 0.005  # 0.5% of capital

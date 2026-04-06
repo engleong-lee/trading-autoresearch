@@ -505,11 +505,6 @@ def generate_signals(data, start_date, end_date):
             if trend == "downtrend":
                 continue
 
-            # ── FILTER: skip very weak trend (ADX < 15) ──
-            adx_val = current.get("adx", 25)
-            if pd.notna(adx_val) and adx_val < 15:
-                continue
-
             # ── FILTER: skip if VIX too high ──
             if vix > VIX_HIGH_THRESHOLD:
                 continue

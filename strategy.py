@@ -77,7 +77,7 @@ EARNINGS_EXIT_DAYS = 0          # Exit swing trades N days before earnings
 
 # Confirmation filters
 RSI_OVERBOUGHT = 100            # Skip entry if RSI above this
-VOL_RATIO_MIN = 0.5            # Minimum volume ratio for entry
+VOL_RATIO_MIN = 0.6            # Minimum volume ratio for entry
 MACD_HIST_ATR_MULT = -1.0      # Skip if MACD hist < this * ATR
 
 
@@ -485,6 +485,19 @@ def generate_signals(data, start_date, end_date):
                         })
                         del open_positions[ticker]
                         continue
+
+                # Swing trade: lock in profit at 3%
+                if pos["strategy_type"] == "swing" and not pos.get("profit_locked"):
+                    if price > pos["entry_price"] * 1.03:
+                        pos["profit_locked"] = True
+                        lock_stop = pos["entry_price"] * 1.01
+                        if lock_stop > pos["stop_loss"]:
+                            pos["stop_loss"] = lock_stop
+                            signals.append({
+                                "date": day_ts, "ticker": ticker, "action": "UPDATE_STOP",
+                                "price": price, "stop_loss": lock_stop,
+                                "take_profit": None, "position_size": 0,
+                            })
 
                 # Swing trade: trailing stop when profitable
                 if pos["strategy_type"] == "swing":

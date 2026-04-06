@@ -78,7 +78,7 @@ EARNINGS_EXIT_DAYS = 1          # Exit swing trades N days before earnings
 
 # Confirmation filters
 RSI_OVERBOUGHT = 999          # Disabled — RSI filter not helpful with short holds
-VOL_RATIO_MIN = 0.5            # Minimum volume ratio for entry
+VOL_RATIO_MIN = 0.3            # Minimum volume ratio for entry
 MACD_HIST_ATR_MULT = -1.0      # Skip if MACD hist < this * ATR
 
 

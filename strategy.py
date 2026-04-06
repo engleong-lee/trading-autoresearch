@@ -34,7 +34,7 @@ ATR_PERIOD = 14
 ATR_STOP_MULTIPLIER = 1.0   # Stop = support - ATR * multiplier
 
 # Swing trading parameters
-SWING_MIN_RR = 2.0           # Minimum reward/risk ratio for swing entries
+SWING_MIN_RR = 1.2           # Minimum reward/risk ratio for swing entries
 SWING_MAX_HOLD_DAYS = 2     # Max hold days for swing trades
 SWING_TRAIL_PROFIT_PCT = 0.03  # Activate trailing stop after this profit %
 SWING_TRAIL_ATR_MULT = 0.8    # Trailing stop distance in ATR units

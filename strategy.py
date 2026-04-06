@@ -51,7 +51,7 @@ TP_OFFSET_PCT = 0.003
 RISK_PCT = 0.01  # 1% of capital
 
 # Market regime filter
-VIX_HIGH_THRESHOLD = 25      # Above this = cautious (smaller positions)
+VIX_HIGH_THRESHOLD = 30      # Above this = cautious (smaller positions)
 VIX_LOW_THRESHOLD = 15       # Below this = aggressive (normal/larger positions)
 
 # Capital

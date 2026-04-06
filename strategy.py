@@ -449,6 +449,18 @@ def generate_signals(data, start_date, end_date):
                         del open_positions[ticker]
                         continue
 
+                # Swing trade: exit if close below mid EMA
+                if pos["strategy_type"] == "swing" and days_held >= 1:
+                    ema_val = current.get("ema_mid", price)
+                    if pd.notna(ema_val) and price < ema_val:
+                        signals.append({
+                            "date": day_ts, "ticker": ticker, "action": "SELL",
+                            "price": price, "stop_loss": None,
+                            "take_profit": None, "position_size": 0,
+                        })
+                        del open_positions[ticker]
+                        continue
+
                 # Swing trade: trailing stop when profitable
                 if pos["strategy_type"] == "swing":
                     if price > pos["entry_price"] * (1 + SWING_TRAIL_PROFIT_PCT):

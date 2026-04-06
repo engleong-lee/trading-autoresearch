@@ -36,7 +36,7 @@ ATR_STOP_MULTIPLIER = 1.0   # Stop = support - ATR * multiplier
 # Swing trading parameters
 SWING_MIN_RR = 1.5           # Minimum reward/risk ratio for swing entries
 SWING_MAX_HOLD_DAYS = 5     # Max hold days for swing trades
-SWING_TRAIL_PROFIT_PCT = 0.03  # Activate trailing stop after this profit %
+SWING_TRAIL_PROFIT_PCT = 0.01  # Activate trailing stop after this profit %
 SWING_TRAIL_ATR_MULT = 0.8    # Trailing stop distance in ATR units
 
 # Trend trading parameters
@@ -67,12 +67,12 @@ SR_MIN_TOUCHES = 2           # Minimum touches to qualify as S/R
 PULLBACK_THRESHOLD_PCT = 0.05  # Price within 4% of support = potential entry
 
 # Candlestick confirmation
-CANDLE_CONFIRM_VIX = 25      # Require candle confirmation when VIX above this
+CANDLE_CONFIRM_VIX = 30      # Require candle confirmation when VIX above this
 CANDLE_BODY_RATIO = 0.35     # Max body/range ratio for hammer/shooting star
 CANDLE_WICK_RATIO = 2.0      # Min long_wick/body ratio for hammer/shooting star
 
 # Earnings avoidance
-EARNINGS_AVOID_ENTRY_DAYS = 2   # Don't enter within N days of earnings
+EARNINGS_AVOID_ENTRY_DAYS = 1   # Don't enter within N days of earnings
 EARNINGS_EXIT_DAYS = 1          # Exit swing trades N days before earnings
 
 # Confirmation filters

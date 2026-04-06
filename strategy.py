@@ -25,9 +25,9 @@ import pandas as pd
 # ─────────────────────────────────────────────────────────────
 
 # EMA periods (from the original strategy: 20, 50, 200)
-EMA_FAST = 8
-EMA_MID = 20
-EMA_SLOW = 150
+EMA_FAST = 10
+EMA_MID = 18
+EMA_SLOW = 200
 
 # ATR for stop-loss calculation
 ATR_PERIOD = 14

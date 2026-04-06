@@ -142,22 +142,26 @@ def find_support_resistance(df, lookback=None):
 
     current_price = recent["Close"].iloc[-1]
 
-    # Find swing lows (potential support)
+    # Find swing lows (potential support) — 7-bar window
     supports = []
-    for i in range(2, len(recent) - 2):
+    for i in range(3, len(recent) - 3):
         if (recent["Low"].iloc[i] <= recent["Low"].iloc[i-1] and
             recent["Low"].iloc[i] <= recent["Low"].iloc[i-2] and
+            recent["Low"].iloc[i] <= recent["Low"].iloc[i-3] and
             recent["Low"].iloc[i] <= recent["Low"].iloc[i+1] and
-            recent["Low"].iloc[i] <= recent["Low"].iloc[i+2]):
+            recent["Low"].iloc[i] <= recent["Low"].iloc[i+2] and
+            recent["Low"].iloc[i] <= recent["Low"].iloc[i+3]):
             supports.append(recent["Low"].iloc[i])
 
-    # Find swing highs (potential resistance)
+    # Find swing highs (potential resistance) — 7-bar window
     resistances = []
-    for i in range(2, len(recent) - 2):
+    for i in range(3, len(recent) - 3):
         if (recent["High"].iloc[i] >= recent["High"].iloc[i-1] and
             recent["High"].iloc[i] >= recent["High"].iloc[i-2] and
+            recent["High"].iloc[i] >= recent["High"].iloc[i-3] and
             recent["High"].iloc[i] >= recent["High"].iloc[i+1] and
-            recent["High"].iloc[i] >= recent["High"].iloc[i+2]):
+            recent["High"].iloc[i] >= recent["High"].iloc[i+2] and
+            recent["High"].iloc[i] >= recent["High"].iloc[i+3]):
             resistances.append(recent["High"].iloc[i])
 
     # Cluster nearby levels (within 1% of each other)

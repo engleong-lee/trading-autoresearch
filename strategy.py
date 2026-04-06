@@ -40,7 +40,7 @@ SWING_TRAIL_PROFIT_PCT = 0.0  # Activate trailing stop after this profit %
 SWING_TRAIL_ATR_MULT = 0.8    # Trailing stop distance in ATR units
 
 # Trend trading parameters
-TREND_MIN_RR = 3.5           # Minimum reward/risk for trend initial entry
+TREND_MIN_RR = 4.0           # Minimum reward/risk for trend initial entry
 TREND_TRAIL_ATR_MULT = 1.5   # Trail stop at N * ATR below recent support
 
 # Entry offset from support (0.3% above support)
@@ -448,6 +448,19 @@ def generate_signals(data, start_date, end_date):
                         })
                         del open_positions[ticker]
                         continue
+
+                # Move to breakeven after 1% profit
+                if pos["strategy_type"] == "swing" and not pos.get("breakeven_set"):
+                    if price > pos["entry_price"] * 1.01:
+                        pos["breakeven_set"] = True
+                        be_stop = pos["entry_price"] * 1.001
+                        if be_stop > pos["stop_loss"]:
+                            pos["stop_loss"] = be_stop
+                            signals.append({
+                                "date": day_ts, "ticker": ticker, "action": "UPDATE_STOP",
+                                "price": price, "stop_loss": be_stop,
+                                "take_profit": None, "position_size": 0,
+                            })
 
                 # Swing trade: gap-down exit
                 if pos["strategy_type"] == "swing" and days_held >= 1:

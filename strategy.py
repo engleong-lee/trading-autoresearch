@@ -73,7 +73,7 @@ CANDLE_WICK_RATIO = 2.0      # Min long_wick/body ratio for hammer/shooting star
 
 # Earnings avoidance
 EARNINGS_AVOID_ENTRY_DAYS = 1   # Don't enter within N days of earnings
-EARNINGS_EXIT_DAYS = 1          # Exit swing trades N days before earnings
+EARNINGS_EXIT_DAYS = 0          # Exit swing trades N days before earnings
 
 # Confirmation filters
 RSI_OVERBOUGHT = 100            # Skip entry if RSI above this

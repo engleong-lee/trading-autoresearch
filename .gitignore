@@ -3,3 +3,8 @@ run.log
 __pycache__/
 *.pyc
 .cache/
+live/config.py
+live/*.log
+live/cron.log
+download.log
+test.log

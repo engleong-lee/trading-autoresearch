@@ -212,8 +212,8 @@ def find_support_resistance(df, lookback=None):
     return supports, resistances
 
 
-def _cluster_levels(levels, pct=0.01):
-    """Cluster nearby price levels, return cluster averages."""
+def _cluster_levels(levels, pct=0.01, min_touches=1):
+    """Cluster nearby price levels, return cluster averages filtered by touch count."""
     if not levels:
         return []
     levels = sorted(levels)
@@ -223,7 +223,7 @@ def _cluster_levels(levels, pct=0.01):
             clusters[-1].append(level)
         else:
             clusters.append([level])
-    return [np.mean(c) for c in clusters]
+    return [np.mean(c) for c in clusters if len(c) >= min_touches]
 
 
 # ─────────────────────────────────────────────────────────────
@@ -574,11 +574,12 @@ def generate_signals(data, start_date, end_date):
             if not supports or not resistances:
                 continue
 
+            entry_found = False
+
+            # ── ENTRY PATH 1: Price near support (pullback entry) ──
             nearest_support = supports[0]
             nearest_resistance = resistances[0]
 
-            # ── ENTRY LOGIC ──
-            # Pattern 1/3: Price near support (pullback entry)
             distance_to_support = (price - nearest_support) / nearest_support
 
             if 0 < distance_to_support < PULLBACK_THRESHOLD_PCT:
@@ -589,64 +590,63 @@ def generate_signals(data, start_date, end_date):
                 risk = entry_price - stop_loss
                 reward = take_profit - entry_price
 
-                if risk <= 0:
+                if risk > 0:
+                    rr_ratio = reward / risk
+
+                    if trend == "uptrend" and rr_ratio >= TREND_MIN_RR:
+                        strategy_type = "trend"
+                        take_profit_signal = None
+                        entry_found = True
+                    elif rr_ratio >= SWING_MIN_RR:
+                        strategy_type = "swing"
+                        take_profit_signal = take_profit
+                        entry_found = True
+
+            if not entry_found:
+                continue
+
+            # Position sizing: risk-adjust based on VIX
+            effective_risk = RISK_PCT * 1.3 if vix < VIX_LOW_THRESHOLD else RISK_PCT
+            risk_amount = capital * effective_risk
+            position_size = int(risk_amount / risk)
+            if position_size <= 0:
+                continue
+            position_size = min(position_size, MAX_POSITION_SHARES)
+
+            # Confirmation filters
+            # RSI not overbought
+            if current["rsi"] > RSI_OVERBOUGHT:
+                continue
+
+            # MACD histogram not deeply negative
+            if current["macd_hist"] < MACD_HIST_ATR_MULT * atr:
+                continue
+
+            # Volume confirmation (above average)
+            if current["vol_ratio"] < VOL_RATIO_MIN:
+                continue
+
+            # Candlestick confirmation required in high-VIX regime
+            if vix > CANDLE_CONFIRM_VIX:
+                if not has_bullish_confirmation(hist):
                     continue
 
-                rr_ratio = reward / risk
+            signals.append({
+                "date": day_ts,
+                "ticker": ticker,
+                "action": "BUY",
+                "price": entry_price,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit_signal,
+                "position_size": position_size,
+            })
 
-                # Decide swing vs trend
-                if trend == "uptrend" and rr_ratio >= TREND_MIN_RR:
-                    strategy_type = "trend"
-                    # Trend trades: no fixed take-profit (use trailing stop)
-                    take_profit_signal = None
-                elif rr_ratio >= SWING_MIN_RR:
-                    strategy_type = "swing"
-                    take_profit_signal = take_profit
-                else:
-                    continue  # R/R not good enough
-
-                # Position sizing: risk-adjust based on VIX
-                effective_risk = RISK_PCT * 1.3 if vix < VIX_LOW_THRESHOLD else RISK_PCT
-                risk_amount = capital * effective_risk
-                position_size = int(risk_amount / risk)
-                if position_size <= 0:
-                    continue
-                position_size = min(position_size, MAX_POSITION_SHARES)
-
-                # Confirmation filters
-                # RSI not overbought
-                if current["rsi"] > RSI_OVERBOUGHT:
-                    continue
-
-                # MACD histogram not deeply negative
-                if current["macd_hist"] < MACD_HIST_ATR_MULT * atr:
-                    continue
-
-                # Volume confirmation (above average)
-                if current["vol_ratio"] < VOL_RATIO_MIN:
-                    continue
-
-                # Candlestick confirmation required in high-VIX regime
-                if vix > CANDLE_CONFIRM_VIX:
-                    if not has_bullish_confirmation(hist):
-                        continue
-
-                signals.append({
-                    "date": day_ts,
-                    "ticker": ticker,
-                    "action": "BUY",
-                    "price": entry_price,
-                    "stop_loss": stop_loss,
-                    "take_profit": take_profit_signal,
-                    "position_size": position_size,
-                })
-
-                open_positions[ticker] = {
-                    "entry_date": day_ts,
-                    "entry_price": entry_price,
-                    "stop_loss": stop_loss,
-                    "strategy_type": strategy_type,
-                }
+            open_positions[ticker] = {
+                "entry_date": day_ts,
+                "entry_price": entry_price,
+                "stop_loss": stop_loss,
+                "strategy_type": strategy_type,
+            }
 
     return pd.DataFrame(signals) if signals else pd.DataFrame(
         columns=["date", "ticker", "action", "price", "stop_loss", "take_profit", "position_size"]

@@ -114,6 +114,14 @@ ATR_LOW_SIZE_MULT = 1.1       # Size multiplier when ATR is low
 GAP_UP_MIN_PCT = 0.01         # Minimum gap-up % for continuation entry
 GAP_DOWN_EXIT_PCT = -0.03     # Gap-down exit threshold (exit if open gaps down this much)
 
+# Correlation / concentration limits
+MAX_PER_SECTOR = 3            # Max concurrent positions in same sector
+STOP_COOLDOWN_DAYS = 2        # Skip re-entry for N days after a stop-loss on same ticker
+
+# SPY regime gate
+REGIME_GATE_ENABLED = True    # Skip entries when SPY in downtrend
+REGIME_RISK_OFF_SIZE_MULT = 0.5  # Size multiplier when SPY neutral (not uptrend)
+
 
 # ─────────────────────────────────────────────────────────────
 # INDICATORS
@@ -554,6 +562,7 @@ def generate_signals(data, start_date, end_date):
 
     # Track open positions for signal generation
     open_positions = {}  # ticker -> {entry_date, entry_price, stop_loss, strategy_type, shares, partial_target, took_partial}
+    stop_cooldowns = {}  # ticker -> date when cooldown expires
     capital = INITIAL_CAPITAL
 
     for day in trading_days:
@@ -598,6 +607,8 @@ def generate_signals(data, start_date, end_date):
                             "price": open_price, "stop_loss": None,
                             "take_profit": None, "position_size": 0,
                         })
+                        # Cooldown after gap-down exit
+                        stop_cooldowns[ticker] = day_ts + pd.Timedelta(days=STOP_COOLDOWN_DAYS)
                         del open_positions[ticker]
                         continue
 
@@ -645,6 +656,9 @@ def generate_signals(data, start_date, end_date):
                             "price": price, "stop_loss": None,
                             "take_profit": None, "position_size": 0,
                         })
+                        # Cooldown if exiting at a loss
+                        if price < pos["entry_price"]:
+                            stop_cooldowns[ticker] = day_ts + pd.Timedelta(days=STOP_COOLDOWN_DAYS)
                         del open_positions[ticker]
                         continue
 
@@ -699,10 +713,32 @@ def generate_signals(data, start_date, end_date):
             if len(open_positions) >= 10:
                 continue
 
+            # ── FILTER: skip if in cooldown after stop-out ──
+            if ticker in stop_cooldowns and day_ts < stop_cooldowns[ticker]:
+                continue
+
             # ── FILTER: skip downtrends ──
             trend = detect_trend(hist)
             if trend == "downtrend":
                 continue
+
+            # ── FILTER: SPY regime gate ──
+            regime_mult = 1.0
+            if REGIME_GATE_ENABLED:
+                if market_regime == "risk_off":
+                    continue
+                elif market_regime == "neutral":
+                    regime_mult = REGIME_RISK_OFF_SIZE_MULT
+
+            # ── FILTER: sector concentration limit ──
+            ticker_sector = SECTOR_MAP.get(ticker)
+            if ticker_sector is not None:
+                sector_count = sum(
+                    1 for t in open_positions
+                    if SECTOR_MAP.get(t) == ticker_sector
+                )
+                if sector_count >= MAX_PER_SECTOR:
+                    continue
 
             # ── FILTER: skip very weak trend (ADX < 15) ──
             adx_val = current.get("adx", 25)
@@ -768,7 +804,7 @@ def generate_signals(data, start_date, end_date):
                 # Position sizing: risk-adjust based on VIX, sector, momentum, vol regime
                 effective_risk = RISK_PCT * 1.3 if vix < VIX_LOW_THRESHOLD else RISK_PCT
                 risk_amount = capital * effective_risk
-                size_mult = sector_size_mult * momentum_mult * atr_vol_mult
+                size_mult = sector_size_mult * momentum_mult * atr_vol_mult * regime_mult
                 position_size = int(risk_amount / risk * size_mult)
                 if position_size <= 0:
                     continue

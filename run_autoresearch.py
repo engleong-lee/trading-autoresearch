@@ -40,6 +40,10 @@ SEARCH_SPACE = {
     "ATR_HIGH_SIZE_MULT": [0.5, 0.7, 0.8, 1.0],
     "ATR_LOW_SIZE_MULT": [1.0, 1.1, 1.2, 1.3],
     "GAP_DOWN_EXIT_PCT": [-0.03, -0.02, -0.015, -0.01],
+    # R6 new params
+    "MAX_PER_SECTOR": [2, 3, 4, 5, 10],
+    "STOP_COOLDOWN_DAYS": [0, 1, 2, 3, 5],
+    "REGIME_RISK_OFF_SIZE_MULT": [0.3, 0.5, 0.7, 1.0],
 }
 
 # How many params to vary per experiment (1-4)

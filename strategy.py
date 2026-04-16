@@ -25,7 +25,7 @@ import pandas as pd
 # ─────────────────────────────────────────────────────────────
 
 # EMA periods (from the original strategy: 20, 50, 200)
-EMA_FAST = 10
+EMA_FAST = 12
 EMA_MID = 21
 EMA_SLOW = 200
 
@@ -34,9 +34,9 @@ ATR_PERIOD = 14
 ATR_STOP_MULTIPLIER = 0.7   # Stop = support - ATR * multiplier
 
 # Swing trading parameters
-SWING_MIN_RR = 1.0           # Minimum reward/risk ratio for swing entries
+SWING_MIN_RR = 1.2           # Minimum reward/risk ratio for swing entries
 SWING_MAX_HOLD_DAYS = 1     # Max hold days for swing trades
-SWING_TRAIL_PROFIT_PCT = 0.05  # Activate trailing stop after this profit %
+SWING_TRAIL_PROFIT_PCT = 0.03  # Activate trailing stop after this profit %
 SWING_TRAIL_ATR_MULT = 0.8    # Trailing stop distance in ATR units
 
 # Trend trading parameters
@@ -47,15 +47,15 @@ TREND_TRAIL_ATR_MULT = 1.5   # Trail stop at N * ATR below recent support
 ENTRY_OFFSET_PCT = 0.002
 
 # Take-profit offset from resistance (0.3% below resistance)
-TP_OFFSET_PCT = 0.002
+TP_OFFSET_PCT = 0.003
 
 # Partial profit taking
-PARTIAL_EXIT_PCT = 0.7        # Take this fraction at intermediate target
-PARTIAL_TARGET_PCT = 0.6      # Intermediate target = entry + this * (TP - entry)
+PARTIAL_EXIT_PCT = 0.4        # Take this fraction at intermediate target
+PARTIAL_TARGET_PCT = 0.5      # Intermediate target = entry + this * (TP - entry)
 
 # Risk per trade
 RISK_PCT = 0.007  # 0.5% of capital
-MAX_POSITION_SHARES = 1000    # Cap shares per trade
+MAX_POSITION_SHARES = 800    # Cap shares per trade
 
 # Market regime filter
 VIX_HIGH_THRESHOLD = 30      # Above this = cautious (smaller positions)
@@ -96,27 +96,27 @@ SECTOR_MAP = {
 }
 SECTOR_RS_LOOKBACK = 30      # Days for RS momentum
 SECTOR_RS_THRESHOLD = 0.0    # RS change threshold for "improving"
-SECTOR_LEADING_BOOST = 1.3   # Position size multiplier for leading sectors
+SECTOR_LEADING_BOOST = 1.0   # Position size multiplier for leading sectors (disabled — reduces overfit)
 
 # Momentum ranking
 MOMENTUM_LOOKBACK = 15       # Days for rate-of-change ranking
-MOMENTUM_TOP_BOOST = 1.3     # Size boost for top-3 momentum tickers
+MOMENTUM_TOP_BOOST = 1.0     # Size boost for top-3 momentum tickers (disabled — reduces overfit)
 MOMENTUM_BOT_PENALTY = 1.0   # Size penalty for bottom-3 momentum tickers
 
 # ATR volatility regime
 ATR_PERCENTILE_LOOKBACK = 60  # Days for ATR percentile calculation
 ATR_HIGH_PCTL = 80            # Above this percentile = high vol → reduce size
 ATR_LOW_PCTL = 30             # Below this percentile = low vol → increase size
-ATR_HIGH_SIZE_MULT = 1.0      # Size multiplier when ATR is high
-ATR_LOW_SIZE_MULT = 1.1       # Size multiplier when ATR is low
+ATR_HIGH_SIZE_MULT = 0.9      # Size multiplier when ATR is high
+ATR_LOW_SIZE_MULT = 1.0       # Size multiplier when ATR is low
 
 # Gap analysis
 GAP_UP_MIN_PCT = 0.01         # Minimum gap-up % for continuation entry
 GAP_DOWN_EXIT_PCT = -0.03     # Gap-down exit threshold (exit if open gaps down this much)
 
 # Correlation / concentration limits
-MAX_PER_SECTOR = 3            # Max concurrent positions in same sector
-STOP_COOLDOWN_DAYS = 2        # Skip re-entry for N days after a stop-loss on same ticker
+MAX_PER_SECTOR = 5            # Max concurrent positions in same sector
+STOP_COOLDOWN_DAYS = 1        # Skip re-entry for N days after a stop-loss on same ticker
 
 # SPY regime gate
 REGIME_GATE_ENABLED = True    # Skip entries when SPY in downtrend
@@ -802,9 +802,10 @@ def generate_signals(data, start_date, end_date):
                     continue  # R/R not good enough
 
                 # Position sizing: risk-adjust based on VIX, sector, momentum, vol regime
-                effective_risk = RISK_PCT * 1.3 if vix < VIX_LOW_THRESHOLD else RISK_PCT
+                effective_risk = RISK_PCT * 1.15 if vix < VIX_LOW_THRESHOLD else RISK_PCT
                 risk_amount = capital * effective_risk
                 size_mult = sector_size_mult * momentum_mult * atr_vol_mult * regime_mult
+                size_mult = max(0.5, min(size_mult, 1.5))  # Clamp to prevent overfit from extreme sizing
                 position_size = int(risk_amount / risk * size_mult)
                 if position_size <= 0:
                     continue

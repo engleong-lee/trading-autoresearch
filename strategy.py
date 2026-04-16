@@ -26,7 +26,7 @@ import pandas as pd
 
 # EMA periods (from the original strategy: 20, 50, 200)
 EMA_FAST = 10
-EMA_MID = 18
+EMA_MID = 21
 EMA_SLOW = 200
 
 # ATR for stop-loss calculation
@@ -47,15 +47,15 @@ TREND_TRAIL_ATR_MULT = 1.5   # Trail stop at N * ATR below recent support
 ENTRY_OFFSET_PCT = 0.002
 
 # Take-profit offset from resistance (0.3% below resistance)
-TP_OFFSET_PCT = 0.005
+TP_OFFSET_PCT = 0.002
 
 # Partial profit taking
 PARTIAL_EXIT_PCT = 0.7        # Take this fraction at intermediate target
-PARTIAL_TARGET_PCT = 0.3      # Intermediate target = entry + this * (TP - entry)
+PARTIAL_TARGET_PCT = 0.6      # Intermediate target = entry + this * (TP - entry)
 
 # Risk per trade
 RISK_PCT = 0.007  # 0.5% of capital
-MAX_POSITION_SHARES = 800    # Cap shares per trade
+MAX_POSITION_SHARES = 1000    # Cap shares per trade
 
 # Market regime filter
 VIX_HIGH_THRESHOLD = 30      # Above this = cautious (smaller positions)
@@ -99,20 +99,20 @@ SECTOR_RS_THRESHOLD = 0.0    # RS change threshold for "improving"
 SECTOR_LEADING_BOOST = 1.3   # Position size multiplier for leading sectors
 
 # Momentum ranking
-MOMENTUM_LOOKBACK = 20       # Days for rate-of-change ranking
-MOMENTUM_TOP_BOOST = 1.2     # Size boost for top-3 momentum tickers
-MOMENTUM_BOT_PENALTY = 0.7   # Size penalty for bottom-3 momentum tickers
+MOMENTUM_LOOKBACK = 15       # Days for rate-of-change ranking
+MOMENTUM_TOP_BOOST = 1.3     # Size boost for top-3 momentum tickers
+MOMENTUM_BOT_PENALTY = 1.0   # Size penalty for bottom-3 momentum tickers
 
 # ATR volatility regime
 ATR_PERCENTILE_LOOKBACK = 60  # Days for ATR percentile calculation
 ATR_HIGH_PCTL = 80            # Above this percentile = high vol → reduce size
 ATR_LOW_PCTL = 30             # Below this percentile = low vol → increase size
-ATR_HIGH_SIZE_MULT = 0.7      # Size multiplier when ATR is high
-ATR_LOW_SIZE_MULT = 1.2       # Size multiplier when ATR is low
+ATR_HIGH_SIZE_MULT = 1.0      # Size multiplier when ATR is high
+ATR_LOW_SIZE_MULT = 1.1       # Size multiplier when ATR is low
 
 # Gap analysis
 GAP_UP_MIN_PCT = 0.01         # Minimum gap-up % for continuation entry
-GAP_DOWN_EXIT_PCT = -0.02     # Gap-down exit threshold (exit if open gaps down this much)
+GAP_DOWN_EXIT_PCT = -0.03     # Gap-down exit threshold (exit if open gaps down this much)
 
 
 # ─────────────────────────────────────────────────────────────

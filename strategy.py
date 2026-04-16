@@ -81,6 +81,22 @@ RSI_OVERBOUGHT = 999          # Disabled — RSI filter not helpful with short h
 VOL_RATIO_MIN = 0.3            # Minimum volume ratio for entry
 MACD_HIST_ATR_MULT = -1.0      # Skip if MACD hist < this * ATR
 
+# SPY regime gate
+REGIME_GATE_ENABLED = True     # Skip entries when SPY in downtrend
+
+# Sector concentration limit
+SECTOR_MAP = {
+    "NVDA": "XLK", "AAPL": "XLK", "AMD": "XLK", "AVGO": "XLK",
+    "CRWD": "XLK", "INTU": "XLK",
+    "V": "XLF", "MA": "XLF",
+    "AMZN": "XLY",
+    "VGK": None,
+}
+MAX_PER_SECTOR = 3            # Max concurrent positions in same sector
+
+# Stop-loss cooldown
+STOP_COOLDOWN_DAYS = 0        # Skip re-entry for N days after stop-out (0=disabled)
+
 
 # ─────────────────────────────────────────────────────────────
 # INDICATORS
@@ -406,6 +422,7 @@ def generate_signals(data, start_date, end_date):
 
     # Track open positions for signal generation
     open_positions = {}  # ticker -> {entry_date, entry_price, stop_loss, strategy_type}
+    stop_cooldowns = {}  # ticker -> date when cooldown expires
     capital = INITIAL_CAPITAL
 
     for day in trading_days:
@@ -459,6 +476,8 @@ def generate_signals(data, start_date, end_date):
                             "price": price, "stop_loss": None,
                             "take_profit": None, "position_size": 0,
                         })
+                        if price < pos["entry_price"]:
+                            stop_cooldowns[ticker] = day_ts + pd.Timedelta(days=STOP_COOLDOWN_DAYS)
                         del open_positions[ticker]
                         continue
 
@@ -511,6 +530,24 @@ def generate_signals(data, start_date, end_date):
 
             # ── FILTER: skip if already at max positions ──
             if len(open_positions) >= 10:
+                continue
+
+            # ── FILTER: SPY regime gate ──
+            if REGIME_GATE_ENABLED and market_regime == "risk_off":
+                continue
+
+            # ── FILTER: sector concentration limit ──
+            ticker_sector = SECTOR_MAP.get(ticker)
+            if ticker_sector is not None:
+                sector_count = sum(
+                    1 for t in open_positions
+                    if SECTOR_MAP.get(t) == ticker_sector
+                )
+                if sector_count >= MAX_PER_SECTOR:
+                    continue
+
+            # ── FILTER: stop-loss cooldown ──
+            if ticker in stop_cooldowns and day_ts < stop_cooldowns[ticker]:
                 continue
 
             # ── FILTER: skip downtrends ──

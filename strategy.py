@@ -82,6 +82,18 @@ VOL_RATIO_MIN = 0.3            # Minimum volume ratio for entry
 MACD_HIST_ATR_MULT = -1.0      # Skip if MACD hist < this * ATR
 
 
+# Sector rotation
+SECTOR_MAP = {
+    "NVDA": "XLK", "AAPL": "XLK", "AMD": "XLK", "AVGO": "XLK",
+    "CRWD": "XLK", "INTU": "XLK",
+    "V": "XLF", "MA": "XLF",
+    "AMZN": "XLY",
+    "VGK": None,  # ETF, no sector
+}
+SECTOR_RS_LOOKBACK = 20      # Days for RS momentum
+SECTOR_RS_THRESHOLD = 0.0    # RS change threshold for "improving"
+
+
 # ─────────────────────────────────────────────────────────────
 # INDICATORS
 # ─────────────────────────────────────────────────────────────
@@ -364,6 +376,62 @@ def get_vix_level(data, date):
     return 20.0
 
 
+def get_sector_quadrant(data, ticker, date):
+    """
+    Classify sector into rotation quadrant.
+    Returns: 'leading', 'improving', 'weakening', 'lagging', or None
+    """
+    sector_etf = SECTOR_MAP.get(ticker)
+    if sector_etf is None or sector_etf not in data or "SPY" not in data:
+        return None
+
+    sector_df = data[sector_etf]
+    spy_df = data["SPY"]
+    date = pd.Timestamp(date)
+
+    # Get recent data
+    sector_prices = sector_df.loc[sector_df.index <= date, "Close"]
+    spy_prices = spy_df.loc[spy_df.index <= date, "Close"]
+
+    if len(sector_prices) < SECTOR_RS_LOOKBACK + 5 or len(spy_prices) < SECTOR_RS_LOOKBACK + 5:
+        return None
+
+    # Align dates
+    common = sector_prices.index.intersection(spy_prices.index)
+    if len(common) < SECTOR_RS_LOOKBACK + 5:
+        return None
+
+    sector_prices = sector_prices.loc[common]
+    spy_prices = spy_prices.loc[common]
+
+    # RS = sector / SPY (normalized)
+    rs = sector_prices / spy_prices
+
+    # Current RS vs moving average
+    rs_ma = rs.rolling(SECTOR_RS_LOOKBACK).mean()
+    rs_current = rs.iloc[-1]
+    rs_ma_current = rs_ma.iloc[-1]
+
+    if pd.isna(rs_ma_current):
+        return None
+
+    # RS momentum (change in RS over lookback)
+    rs_change = rs.iloc[-1] - rs.iloc[-SECTOR_RS_LOOKBACK]
+
+    # Quadrant classification
+    above_ma = rs_current > rs_ma_current
+    improving = rs_change > SECTOR_RS_THRESHOLD
+
+    if above_ma and improving:
+        return "leading"
+    elif not above_ma and improving:
+        return "improving"
+    elif above_ma and not improving:
+        return "weakening"
+    else:
+        return "lagging"
+
+
 # ─────────────────────────────────────────────────────────────
 # SIGNAL GENERATION
 # ─────────────────────────────────────────────────────────────
@@ -532,6 +600,13 @@ def generate_signals(data, start_date, end_date):
             if dte is not None and 0 < dte <= EARNINGS_AVOID_ENTRY_DAYS:
                 continue
 
+            # ── SECTOR ROTATION FILTER ──
+            sector_q = get_sector_quadrant(data, ticker, day_ts)
+            # Only boost leading sectors
+            sector_size_mult = 1.0
+            if sector_q == "leading":
+                sector_size_mult = 1.1
+
             # ── FIND SUPPORT/RESISTANCE ──
             supports, resistances = find_support_resistance(hist)
             if not supports or not resistances:
@@ -568,10 +643,10 @@ def generate_signals(data, start_date, end_date):
                 else:
                     continue  # R/R not good enough
 
-                # Position sizing: risk-adjust based on VIX
+                # Position sizing: risk-adjust based on VIX and sector rotation
                 effective_risk = RISK_PCT * 1.3 if vix < VIX_LOW_THRESHOLD else RISK_PCT
                 risk_amount = capital * effective_risk
-                position_size = int(risk_amount / risk)
+                position_size = int(risk_amount / risk * sector_size_mult)
                 if position_size <= 0:
                     continue
                 position_size = min(position_size, MAX_POSITION_SHARES)

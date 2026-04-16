@@ -1,0 +1,334 @@
+[
+  {
+    "exp": 1,
+    "sharpe": 17.1916,
+    "improved": false,
+    "changes": {
+      "MAX_POSITION_SHARES": "500",
+      "ATR_STOP_MULTIPLIER": "1.0"
+    },
+    "elapsed": 8.9
+  },
+  {
+    "exp": 2,
+    "sharpe": 16.3249,
+    "improved": false,
+    "changes": {
+      "SR_LOOKBACK": "50",
+      "VOL_RATIO_MIN": "0.5",
+      "TP_OFFSET_PCT": "0.005",
+      "ATR_STOP_MULTIPLIER": "1.2"
+    },
+    "elapsed": 8.7
+  },
+  {
+    "exp": 3,
+    "sharpe": 15.6986,
+    "improved": false,
+    "changes": {
+      "SWING_MAX_HOLD_DAYS": "2",
+      "EMA_FAST": "8"
+    },
+    "elapsed": 7.9
+  },
+  {
+    "exp": 4,
+    "sharpe": 16.8804,
+    "improved": false,
+    "changes": {
+      "ATR_STOP_MULTIPLIER": "1.2",
+      "RISK_PCT": "0.007",
+      "MAX_POSITION_SHARES": "800"
+    },
+    "elapsed": 8.7
+  },
+  {
+    "exp": 5,
+    "sharpe": 17.815,
+    "improved": false,
+    "changes": {
+      "PARTIAL_EXIT_PCT": "0.4",
+      "EMA_MID": "15",
+      "VOL_RATIO_MIN": "0.3",
+      "SWING_MIN_RR": "1.2"
+    },
+    "elapsed": 8.7
+  },
+  {
+    "exp": 6,
+    "sharpe": 17.8262,
+    "improved": false,
+    "changes": {
+      "PARTIAL_EXIT_PCT": "0.4",
+      "SECTOR_LEADING_BOOST": "1.05"
+    },
+    "elapsed": 8.5
+  },
+  {
+    "exp": 7,
+    "sharpe": 17.8044,
+    "improved": false,
+    "changes": {
+      "SECTOR_RS_LOOKBACK": "15",
+      "ATR_STOP_MULTIPLIER": "0.7"
+    },
+    "elapsed": 8.5
+  },
+  {
+    "exp": 8,
+    "sharpe": 13.7399,
+    "improved": false,
+    "changes": {
+      "SR_LOOKBACK": "40",
+      "PULLBACK_THRESHOLD_PCT": "0.04"
+    },
+    "elapsed": 8.1
+  },
+  {
+    "exp": 9,
+    "sharpe": 17.882,
+    "improved": false,
+    "changes": {
+      "SWING_TRAIL_ATR_MULT": "1.0"
+    },
+    "elapsed": 8.6
+  },
+  {
+    "exp": 10,
+    "sharpe": 13.7021,
+    "improved": false,
+    "changes": {
+      "SR_LOOKBACK": "60",
+      "PARTIAL_EXIT_PCT": "0.6",
+      "RISK_PCT": "0.003",
+      "PULLBACK_THRESHOLD_PCT": "0.04"
+    },
+    "elapsed": 10.3
+  },
+  {
+    "exp": 11,
+    "sharpe": 17.3301,
+    "improved": false,
+    "changes": {
+      "EMA_FAST": "12",
+      "MAX_POSITION_SHARES": "400",
+      "SWING_TRAIL_PROFIT_PCT": "0.03",
+      "SWING_MIN_RR": "1.5"
+    },
+    "elapsed": 8.8
+  },
+  {
+    "exp": 12,
+    "sharpe": 17.9011,
+    "improved": true,
+    "changes": {
+      "TP_OFFSET_PCT": "0.005",
+      "PARTIAL_TARGET_PCT": "0.3",
+      "EMA_FAST": "10",
+      "PULLBACK_THRESHOLD_PCT": "0.07"
+    },
+    "elapsed": 8.7
+  },
+  {
+    "exp": 13,
+    "sharpe": 11.1415,
+    "improved": false,
+    "changes": {
+      "ENTRY_OFFSET_PCT": "0.003",
+      "SWING_MIN_RR": "2.0",
+      "ATR_STOP_MULTIPLIER": "1.2"
+    },
+    "elapsed": 10.1
+  },
+  {
+    "exp": 14,
+    "sharpe": 17.789,
+    "improved": false,
+    "changes": {
+      "SECTOR_LEADING_BOOST": "1.05",
+      "ENTRY_OFFSET_PCT": "0.002",
+      "SECTOR_RS_LOOKBACK": "20",
+      "MAX_POSITION_SHARES": "600"
+    },
+    "elapsed": 9.4
+  },
+  {
+    "exp": 15,
+    "sharpe": 17.8296,
+    "improved": false,
+    "changes": {
+      "MAX_POSITION_SHARES": "600",
+      "PARTIAL_EXIT_PCT": "0.4",
+      "ATR_STOP_MULTIPLIER": "0.7",
+      "SWING_TRAIL_ATR_MULT": "0.5"
+    },
+    "elapsed": 8.9
+  },
+  {
+    "exp": 16,
+    "sharpe": 17.9011,
+    "improved": false,
+    "changes": {
+      "ATR_STOP_MULTIPLIER": "0.7",
+      "SWING_MIN_RR": "1.0",
+      "SWING_TRAIL_PROFIT_PCT": "0.02",
+      "EMA_MID": "18"
+    },
+    "elapsed": 8.6
+  },
+  {
+    "exp": 17,
+    "sharpe": 14.6072,
+    "improved": false,
+    "changes": {
+      "SWING_TRAIL_ATR_MULT": "0.8",
+      "SWING_MAX_HOLD_DAYS": "3",
+      "MAX_POSITION_SHARES": "400",
+      "RISK_PCT": "0.01"
+    },
+    "elapsed": 7.7
+  },
+  {
+    "exp": 18,
+    "sharpe": 17.194,
+    "improved": false,
+    "changes": {
+      "MAX_POSITION_SHARES": "600",
+      "RISK_PCT": "0.007",
+      "ATR_STOP_MULTIPLIER": "1.0"
+    },
+    "elapsed": 8.6
+  },
+  {
+    "exp": 19,
+    "sharpe": 15.2647,
+    "improved": false,
+    "changes": {
+      "SWING_TRAIL_PROFIT_PCT": "0.05",
+      "PULLBACK_THRESHOLD_PCT": "0.05",
+      "SR_LOOKBACK": "50"
+    },
+    "elapsed": 9.3
+  },
+  {
+    "exp": 20,
+    "sharpe": 14.8177,
+    "improved": false,
+    "changes": {
+      "SWING_MAX_HOLD_DAYS": "3"
+    },
+    "elapsed": 7.8
+  },
+  {
+    "exp": 21,
+    "sharpe": 17.7628,
+    "improved": false,
+    "changes": {
+      "SWING_TRAIL_PROFIT_PCT": "0.04",
+      "EMA_FAST": "8",
+      "SECTOR_RS_LOOKBACK": "40",
+      "SR_LOOKBACK": "50"
+    },
+    "elapsed": 8.5
+  },
+  {
+    "exp": 22,
+    "sharpe": 18.0097,
+    "improved": true,
+    "changes": {
+      "SECTOR_LEADING_BOOST": "1.3"
+    },
+    "elapsed": 8.5
+  },
+  {
+    "exp": 23,
+    "sharpe": 18.0097,
+    "improved": false,
+    "changes": {
+      "SR_LOOKBACK": "50",
+      "SWING_TRAIL_PROFIT_PCT": "0.04"
+    },
+    "elapsed": 9.0
+  },
+  {
+    "exp": 24,
+    "sharpe": 16.2438,
+    "improved": false,
+    "changes": {
+      "ENTRY_OFFSET_PCT": "0.002",
+      "SWING_MIN_RR": "1.5",
+      "ATR_STOP_MULTIPLIER": "0.8",
+      "SWING_TRAIL_PROFIT_PCT": "0.02"
+    },
+    "elapsed": 8.9
+  },
+  {
+    "exp": 25,
+    "sharpe": 17.8235,
+    "improved": false,
+    "changes": {
+      "MAX_POSITION_SHARES": "800",
+      "SWING_TRAIL_ATR_MULT": "1.2",
+      "EMA_FAST": "12",
+      "SECTOR_RS_LOOKBACK": "15"
+    },
+    "elapsed": 8.8
+  },
+  {
+    "exp": 26,
+    "sharpe": 14.1167,
+    "improved": false,
+    "changes": {
+      "SECTOR_LEADING_BOOST": "1.0",
+      "SWING_MIN_RR": "2.0",
+      "SWING_MAX_HOLD_DAYS": "3",
+      "ENTRY_OFFSET_PCT": "0.001"
+    },
+    "elapsed": 8.4
+  },
+  {
+    "exp": 27,
+    "sharpe": 17.917,
+    "improved": false,
+    "changes": {
+      "SWING_TRAIL_ATR_MULT": "1.0",
+      "SR_LOOKBACK": "60"
+    },
+    "elapsed": 9.4
+  },
+  {
+    "exp": 28,
+    "sharpe": 16.1092,
+    "improved": false,
+    "changes": {
+      "PARTIAL_TARGET_PCT": "0.4",
+      "ENTRY_OFFSET_PCT": "0.003",
+      "ATR_STOP_MULTIPLIER": "1.2",
+      "PARTIAL_EXIT_PCT": "0.6"
+    },
+    "elapsed": 8.7
+  },
+  {
+    "exp": 29,
+    "sharpe": 16.2631,
+    "improved": false,
+    "changes": {
+      "SWING_MIN_RR": "1.0",
+      "ATR_STOP_MULTIPLIER": "1.2",
+      "VOL_RATIO_MIN": "0.2",
+      "TP_OFFSET_PCT": "0.005"
+    },
+    "elapsed": 9.0
+  },
+  {
+    "exp": 30,
+    "sharpe": 16.4651,
+    "improved": false,
+    "changes": {
+      "SR_LOOKBACK": "90",
+      "PARTIAL_EXIT_PCT": "0.3",
+      "RISK_PCT": "0.003"
+    },
+    "elapsed": 11.9
+  }
+]

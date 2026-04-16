@@ -31,12 +31,12 @@ EMA_SLOW = 200
 
 # ATR for stop-loss calculation
 ATR_PERIOD = 14
-ATR_STOP_MULTIPLIER = 1.0   # Stop = support - ATR * multiplier
+ATR_STOP_MULTIPLIER = 0.7   # Stop = support - ATR * multiplier
 
 # Swing trading parameters
-SWING_MIN_RR = 1.2           # Minimum reward/risk ratio for swing entries
-SWING_MAX_HOLD_DAYS = 2     # Max hold days for swing trades
-SWING_TRAIL_PROFIT_PCT = 0.03  # Activate trailing stop after this profit %
+SWING_MIN_RR = 1.0           # Minimum reward/risk ratio for swing entries
+SWING_MAX_HOLD_DAYS = 1     # Max hold days for swing trades
+SWING_TRAIL_PROFIT_PCT = 0.05  # Activate trailing stop after this profit %
 SWING_TRAIL_ATR_MULT = 0.8    # Trailing stop distance in ATR units
 
 # Trend trading parameters
@@ -50,12 +50,12 @@ ENTRY_OFFSET_PCT = 0.002
 TP_OFFSET_PCT = 0.004
 
 # Partial profit taking
-PARTIAL_EXIT_PCT = 0.5        # Take this fraction at intermediate target
+PARTIAL_EXIT_PCT = 0.7        # Take this fraction at intermediate target
 PARTIAL_TARGET_PCT = 0.5      # Intermediate target = entry + this * (TP - entry)
 
 # Risk per trade
-RISK_PCT = 0.005  # 0.5% of capital
-MAX_POSITION_SHARES = 600    # Cap shares per trade
+RISK_PCT = 0.007  # 0.5% of capital
+MAX_POSITION_SHARES = 800    # Cap shares per trade
 
 # Market regime filter
 VIX_HIGH_THRESHOLD = 30      # Above this = cautious (smaller positions)
@@ -65,7 +65,7 @@ VIX_LOW_THRESHOLD = 15       # Below this = aggressive (normal/larger positions)
 INITIAL_CAPITAL = 100_000.0
 
 # Support/Resistance lookback
-SR_LOOKBACK = 60             # Days to look back for S/R levels
+SR_LOOKBACK = 50             # Days to look back for S/R levels
 SR_MIN_TOUCHES = 2           # Minimum touches to qualify as S/R
 
 # Pattern detection
@@ -94,8 +94,9 @@ SECTOR_MAP = {
     "AMZN": "XLY",
     "VGK": None,  # ETF, no sector
 }
-SECTOR_RS_LOOKBACK = 20      # Days for RS momentum
+SECTOR_RS_LOOKBACK = 30      # Days for RS momentum
 SECTOR_RS_THRESHOLD = 0.0    # RS change threshold for "improving"
+SECTOR_LEADING_BOOST = 1.1   # Position size multiplier for leading sectors
 
 
 # ─────────────────────────────────────────────────────────────
@@ -632,7 +633,7 @@ def generate_signals(data, start_date, end_date):
             # Only boost leading sectors
             sector_size_mult = 1.0
             if sector_q == "leading":
-                sector_size_mult = 1.1
+                sector_size_mult = SECTOR_LEADING_BOOST
 
             # ── FIND SUPPORT/RESISTANCE ──
             supports, resistances = find_support_resistance(hist)

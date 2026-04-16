@@ -193,11 +193,12 @@ def run_backtest(signals_df, price_data, start_date, end_date):
         signals_df: DataFrame with columns:
             - date (datetime): signal date
             - ticker (str): stock ticker
-            - action (str): 'BUY' or 'SELL'
+            - action (str): 'BUY', 'SELL', 'UPDATE_STOP', 'SHORT', or 'COVER'
             - price (float): intended entry/exit price
-            - stop_loss (float): stop loss price (for BUY signals)
-            - take_profit (float): optional profit target (for BUY signals)
-            - position_size (int): number of shares (for BUY signals)
+            - stop_loss (float): stop loss price (for BUY/SHORT signals)
+            - take_profit (float): optional profit target
+            - position_size (int): number of shares
+              For SELL: if 0 or >= pos shares, full exit; if > 0 and < shares, partial exit
         price_data: dict of {ticker: DataFrame} with OHLCV
         start_date: backtest start (str or Timestamp)
         end_date: backtest end (str or Timestamp)
@@ -209,9 +210,10 @@ def run_backtest(signals_df, price_data, start_date, end_date):
     end_date = pd.Timestamp(end_date)
 
     capital = INITIAL_CAPITAL
-    positions = {}  # ticker -> {shares, entry_price, entry_date, stop_loss, take_profit}
+    positions = {}  # ticker -> {shares, entry_price, entry_date, stop_loss, take_profit, direction}
     trades = []     # completed trades
     equity_curve = []
+    SHORT_BORROW_RATE = 0.005 / 252  # 0.5% annualized, daily cost
 
     # Get all trading days in range
     all_dates = set()
@@ -248,46 +250,98 @@ def run_backtest(signals_df, price_data, start_date, end_date):
             low = row["Low"]
             high = row["High"]
             open_price = row["Open"]
+            direction = pos.get("direction", "long")
 
-            # Stop loss hit (check low of day)
-            if pos["stop_loss"] is not None and low <= pos["stop_loss"]:
-                exit_price = min(open_price, pos["stop_loss"])  # gap down scenario
-                exit_price *= (1 - SLIPPAGE_PCT / 100)
-                pnl = (exit_price - pos["entry_price"]) * pos["shares"] - 2 * COMMISSION_PER_TRADE
-                capital += pos["entry_price"] * pos["shares"] + pnl
-                trades.append({
-                    "ticker": ticker,
-                    "entry_date": pos["entry_date"],
-                    "exit_date": day_ts,
-                    "entry_price": pos["entry_price"],
-                    "exit_price": exit_price,
-                    "shares": pos["shares"],
-                    "pnl": pnl,
-                    "exit_reason": "stop_loss",
-                    "hold_days": (day_ts - pos["entry_date"]).days,
-                })
-                tickers_to_close.append(ticker)
-                continue
+            # Borrow cost for shorts
+            if direction == "short":
+                borrow_cost = pos["entry_price"] * pos["shares"] * SHORT_BORROW_RATE
+                capital -= borrow_cost
 
-            # Take profit hit (check high of day)
-            if pos.get("take_profit") is not None and high >= pos["take_profit"]:
-                exit_price = max(open_price, pos["take_profit"])
-                exit_price *= (1 - SLIPPAGE_PCT / 100)
-                pnl = (exit_price - pos["entry_price"]) * pos["shares"] - 2 * COMMISSION_PER_TRADE
-                capital += pos["entry_price"] * pos["shares"] + pnl
-                trades.append({
-                    "ticker": ticker,
-                    "entry_date": pos["entry_date"],
-                    "exit_date": day_ts,
-                    "entry_price": pos["entry_price"],
-                    "exit_price": exit_price,
-                    "shares": pos["shares"],
-                    "pnl": pnl,
-                    "exit_reason": "take_profit",
-                    "hold_days": (day_ts - pos["entry_date"]).days,
-                })
-                tickers_to_close.append(ticker)
-                continue
+            if direction == "long":
+                # Stop loss hit (check low of day)
+                if pos["stop_loss"] is not None and low <= pos["stop_loss"]:
+                    exit_price = min(open_price, pos["stop_loss"])  # gap down scenario
+                    exit_price *= (1 - SLIPPAGE_PCT / 100)
+                    pnl = (exit_price - pos["entry_price"]) * pos["shares"] - 2 * COMMISSION_PER_TRADE
+                    capital += pos["entry_price"] * pos["shares"] + pnl
+                    trades.append({
+                        "ticker": ticker,
+                        "entry_date": pos["entry_date"],
+                        "exit_date": day_ts,
+                        "entry_price": pos["entry_price"],
+                        "exit_price": exit_price,
+                        "shares": pos["shares"],
+                        "pnl": pnl,
+                        "exit_reason": "stop_loss",
+                        "hold_days": (day_ts - pos["entry_date"]).days,
+                        "direction": "long",
+                    })
+                    tickers_to_close.append(ticker)
+                    continue
+
+                # Take profit hit (check high of day)
+                if pos.get("take_profit") is not None and high >= pos["take_profit"]:
+                    exit_price = max(open_price, pos["take_profit"])
+                    exit_price *= (1 - SLIPPAGE_PCT / 100)
+                    pnl = (exit_price - pos["entry_price"]) * pos["shares"] - 2 * COMMISSION_PER_TRADE
+                    capital += pos["entry_price"] * pos["shares"] + pnl
+                    trades.append({
+                        "ticker": ticker,
+                        "entry_date": pos["entry_date"],
+                        "exit_date": day_ts,
+                        "entry_price": pos["entry_price"],
+                        "exit_price": exit_price,
+                        "shares": pos["shares"],
+                        "pnl": pnl,
+                        "exit_reason": "take_profit",
+                        "hold_days": (day_ts - pos["entry_date"]).days,
+                        "direction": "long",
+                    })
+                    tickers_to_close.append(ticker)
+                    continue
+
+            else:  # short position
+                # Stop loss for short: triggered if HIGH >= stop_loss
+                if pos["stop_loss"] is not None and high >= pos["stop_loss"]:
+                    exit_price = max(open_price, pos["stop_loss"])
+                    exit_price *= (1 + SLIPPAGE_PCT / 100)  # slippage hurts on cover
+                    pnl = (pos["entry_price"] - exit_price) * pos["shares"] - 2 * COMMISSION_PER_TRADE
+                    capital += pos["entry_price"] * pos["shares"] + pnl
+                    trades.append({
+                        "ticker": ticker,
+                        "entry_date": pos["entry_date"],
+                        "exit_date": day_ts,
+                        "entry_price": pos["entry_price"],
+                        "exit_price": exit_price,
+                        "shares": pos["shares"],
+                        "pnl": pnl,
+                        "exit_reason": "stop_loss",
+                        "hold_days": (day_ts - pos["entry_date"]).days,
+                        "direction": "short",
+                    })
+                    tickers_to_close.append(ticker)
+                    continue
+
+                # Take profit for short: triggered if LOW <= take_profit
+                if pos.get("take_profit") is not None and low <= pos["take_profit"]:
+                    exit_price = min(open_price, pos["take_profit"])
+                    exit_price *= (1 + SLIPPAGE_PCT / 100)
+                    pnl = (pos["entry_price"] - exit_price) * pos["shares"] - 2 * COMMISSION_PER_TRADE
+                    capital += pos["entry_price"] * pos["shares"] + pnl
+                    trades.append({
+                        "ticker": ticker,
+                        "entry_date": pos["entry_date"],
+                        "exit_date": day_ts,
+                        "entry_price": pos["entry_price"],
+                        "exit_price": exit_price,
+                        "shares": pos["shares"],
+                        "pnl": pnl,
+                        "exit_reason": "take_profit",
+                        "hold_days": (day_ts - pos["entry_date"]).days,
+                        "direction": "short",
+                    })
+                    tickers_to_close.append(ticker)
+                    continue
 
         for t in tickers_to_close:
             del positions[t]
@@ -331,51 +385,165 @@ def run_backtest(signals_df, price_data, start_date, end_date):
                         "entry_date": day_ts,
                         "stop_loss": sig.get("stop_loss"),
                         "take_profit": sig.get("take_profit"),
+                        "direction": "long",
                     }
 
-                elif action == "SELL" and ticker in positions:
+                elif action == "SELL" and ticker in positions and positions[ticker].get("direction", "long") == "long":
                     pos = positions[ticker]
                     if ticker not in price_data or day_ts not in price_data[ticker].index:
                         continue
                     exit_price = sig["price"] * (1 - SLIPPAGE_PCT / 100)
-                    pnl = (exit_price - pos["entry_price"]) * pos["shares"] - 2 * COMMISSION_PER_TRADE
-                    capital += pos["entry_price"] * pos["shares"] + pnl
-                    trades.append({
-                        "ticker": ticker,
-                        "entry_date": pos["entry_date"],
-                        "exit_date": day_ts,
-                        "entry_price": pos["entry_price"],
-                        "exit_price": exit_price,
-                        "shares": pos["shares"],
-                        "pnl": pnl,
-                        "exit_reason": "signal",
-                        "hold_days": (day_ts - pos["entry_date"]).days,
-                    })
-                    del positions[ticker]
+
+                    # Partial exit support
+                    sell_shares = int(sig.get("position_size", 0))
+                    if sell_shares > 0 and sell_shares < pos["shares"]:
+                        # Partial exit
+                        pnl = (exit_price - pos["entry_price"]) * sell_shares - 2 * COMMISSION_PER_TRADE
+                        capital += pos["entry_price"] * sell_shares + pnl
+                        trades.append({
+                            "ticker": ticker,
+                            "entry_date": pos["entry_date"],
+                            "exit_date": day_ts,
+                            "entry_price": pos["entry_price"],
+                            "exit_price": exit_price,
+                            "shares": sell_shares,
+                            "pnl": pnl,
+                            "exit_reason": "partial_exit",
+                            "hold_days": (day_ts - pos["entry_date"]).days,
+                            "direction": "long",
+                        })
+                        pos["shares"] -= sell_shares
+                    else:
+                        # Full exit
+                        pnl = (exit_price - pos["entry_price"]) * pos["shares"] - 2 * COMMISSION_PER_TRADE
+                        capital += pos["entry_price"] * pos["shares"] + pnl
+                        trades.append({
+                            "ticker": ticker,
+                            "entry_date": pos["entry_date"],
+                            "exit_date": day_ts,
+                            "entry_price": pos["entry_price"],
+                            "exit_price": exit_price,
+                            "shares": pos["shares"],
+                            "pnl": pnl,
+                            "exit_reason": "signal",
+                            "hold_days": (day_ts - pos["entry_date"]).days,
+                            "direction": "long",
+                        })
+                        del positions[ticker]
+
+                elif action == "SHORT" and ticker not in positions:
+                    if len(positions) >= MAX_CONCURRENT_POSITIONS:
+                        continue
+                    if ticker not in price_data or day_ts not in price_data[ticker].index:
+                        continue
+
+                    entry_price = sig["price"] * (1 - SLIPPAGE_PCT / 100)  # short gets worse fill
+                    shares = int(sig.get("position_size", 0))
+                    if shares <= 0:
+                        stop = sig.get("stop_loss", entry_price * 1.05)
+                        risk_per_share = max(stop - entry_price, 0.01)
+                        risk_amount = capital * (RISK_PER_TRADE_PCT / 100)
+                        shares = int(risk_amount / risk_per_share)
+
+                    # Short proceeds go to capital, but we need margin
+                    margin_req = entry_price * shares * 0.5  # 50% margin
+                    if margin_req + COMMISSION_PER_TRADE > capital:
+                        shares = int((capital - COMMISSION_PER_TRADE) / (entry_price * 0.5))
+                    if shares <= 0:
+                        continue
+
+                    capital -= COMMISSION_PER_TRADE  # Only commission, proceeds are held
+                    positions[ticker] = {
+                        "shares": shares,
+                        "entry_price": entry_price,
+                        "entry_date": day_ts,
+                        "stop_loss": sig.get("stop_loss"),
+                        "take_profit": sig.get("take_profit"),
+                        "direction": "short",
+                    }
+
+                elif action == "COVER" and ticker in positions and positions[ticker].get("direction") == "short":
+                    pos = positions[ticker]
+                    if ticker not in price_data or day_ts not in price_data[ticker].index:
+                        continue
+                    exit_price = sig["price"] * (1 + SLIPPAGE_PCT / 100)  # cover gets worse fill
+
+                    # Partial cover support
+                    cover_shares = int(sig.get("position_size", 0))
+                    if cover_shares > 0 and cover_shares < pos["shares"]:
+                        pnl = (pos["entry_price"] - exit_price) * cover_shares - 2 * COMMISSION_PER_TRADE
+                        capital += pos["entry_price"] * cover_shares + pnl
+                        trades.append({
+                            "ticker": ticker,
+                            "entry_date": pos["entry_date"],
+                            "exit_date": day_ts,
+                            "entry_price": pos["entry_price"],
+                            "exit_price": exit_price,
+                            "shares": cover_shares,
+                            "pnl": pnl,
+                            "exit_reason": "partial_cover",
+                            "hold_days": (day_ts - pos["entry_date"]).days,
+                            "direction": "short",
+                        })
+                        pos["shares"] -= cover_shares
+                    else:
+                        pnl = (pos["entry_price"] - exit_price) * pos["shares"] - 2 * COMMISSION_PER_TRADE
+                        capital += pos["entry_price"] * pos["shares"] + pnl
+                        trades.append({
+                            "ticker": ticker,
+                            "entry_date": pos["entry_date"],
+                            "exit_date": day_ts,
+                            "entry_price": pos["entry_price"],
+                            "exit_price": exit_price,
+                            "shares": pos["shares"],
+                            "pnl": pnl,
+                            "exit_reason": "signal",
+                            "hold_days": (day_ts - pos["entry_date"]).days,
+                            "direction": "short",
+                        })
+                        del positions[ticker]
 
                 elif action == "UPDATE_STOP" and ticker in positions:
                     new_stop = sig.get("stop_loss")
-                    if new_stop is not None and new_stop > positions[ticker]["stop_loss"]:
-                        positions[ticker]["stop_loss"] = new_stop
+                    direction = positions[ticker].get("direction", "long")
+                    if new_stop is not None:
+                        if direction == "long" and new_stop > positions[ticker]["stop_loss"]:
+                            positions[ticker]["stop_loss"] = new_stop
+                        elif direction == "short" and new_stop < positions[ticker]["stop_loss"]:
+                            positions[ticker]["stop_loss"] = new_stop
 
         # 3. Calculate equity
         equity = capital
         for ticker, pos in positions.items():
+            direction = pos.get("direction", "long")
             if ticker in price_data and day_ts in price_data[ticker].index:
-                equity += price_data[ticker].loc[day_ts, "Close"] * pos["shares"]
+                mark_price = price_data[ticker].loc[day_ts, "Close"]
             else:
-                equity += pos["entry_price"] * pos["shares"]
+                mark_price = pos["entry_price"]
+            if direction == "long":
+                equity += mark_price * pos["shares"]
+            else:  # short: equity = entry_proceeds + unrealized P&L
+                equity += pos["entry_price"] * pos["shares"] + (pos["entry_price"] - mark_price) * pos["shares"]
         equity_curve.append({"date": day_ts, "equity": equity})
 
     # Force-close remaining positions at end
     for ticker, pos in list(positions.items()):
         last_day = trading_days[-1]
+        direction = pos.get("direction", "long")
         if ticker in price_data and pd.Timestamp(last_day) in price_data[ticker].index:
             exit_price = price_data[ticker].loc[pd.Timestamp(last_day), "Close"]
         else:
             exit_price = pos["entry_price"]
-        exit_price *= (1 - SLIPPAGE_PCT / 100)
-        pnl = (exit_price - pos["entry_price"]) * pos["shares"] - 2 * COMMISSION_PER_TRADE
+
+        if direction == "long":
+            exit_price *= (1 - SLIPPAGE_PCT / 100)
+            pnl = (exit_price - pos["entry_price"]) * pos["shares"] - 2 * COMMISSION_PER_TRADE
+            capital += pos["entry_price"] * pos["shares"] + pnl
+        else:
+            exit_price *= (1 + SLIPPAGE_PCT / 100)
+            pnl = (pos["entry_price"] - exit_price) * pos["shares"] - 2 * COMMISSION_PER_TRADE
+            capital += pos["entry_price"] * pos["shares"] + pnl
+
         trades.append({
             "ticker": ticker,
             "entry_date": pos["entry_date"],
@@ -386,6 +554,7 @@ def run_backtest(signals_df, price_data, start_date, end_date):
             "pnl": pnl,
             "exit_reason": "end_of_period",
             "hold_days": (pd.Timestamp(last_day) - pos["entry_date"]).days,
+            "direction": direction,
         })
 
     return _compute_metrics(trades, equity_curve)

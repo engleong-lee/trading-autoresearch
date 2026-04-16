@@ -98,6 +98,22 @@ SECTOR_RS_LOOKBACK = 30      # Days for RS momentum
 SECTOR_RS_THRESHOLD = 0.0    # RS change threshold for "improving"
 SECTOR_LEADING_BOOST = 1.3   # Position size multiplier for leading sectors
 
+# Momentum ranking
+MOMENTUM_LOOKBACK = 20       # Days for rate-of-change ranking
+MOMENTUM_TOP_BOOST = 1.2     # Size boost for top-3 momentum tickers
+MOMENTUM_BOT_PENALTY = 0.7   # Size penalty for bottom-3 momentum tickers
+
+# ATR volatility regime
+ATR_PERCENTILE_LOOKBACK = 60  # Days for ATR percentile calculation
+ATR_HIGH_PCTL = 80            # Above this percentile = high vol → reduce size
+ATR_LOW_PCTL = 30             # Below this percentile = low vol → increase size
+ATR_HIGH_SIZE_MULT = 0.7      # Size multiplier when ATR is high
+ATR_LOW_SIZE_MULT = 1.2       # Size multiplier when ATR is low
+
+# Gap analysis
+GAP_UP_MIN_PCT = 0.01         # Minimum gap-up % for continuation entry
+GAP_DOWN_EXIT_PCT = -0.02     # Gap-down exit threshold (exit if open gaps down this much)
+
 
 # ─────────────────────────────────────────────────────────────
 # INDICATORS
@@ -437,6 +453,65 @@ def get_sector_quadrant(data, ticker, date):
         return "lagging"
 
 
+def compute_momentum_ranks(ticker_data, day_ts):
+    """
+    Rank watchlist tickers by momentum (rate of change over lookback).
+    Returns dict of ticker -> size multiplier.
+    """
+    rocs = {}
+    for ticker, df in ticker_data.items():
+        if day_ts not in df.index:
+            continue
+        hist = df.loc[:day_ts]
+        if len(hist) < MOMENTUM_LOOKBACK + 1:
+            continue
+        roc = (hist["Close"].iloc[-1] / hist["Close"].iloc[-MOMENTUM_LOOKBACK] - 1)
+        rocs[ticker] = roc
+
+    if len(rocs) < 3:
+        return {t: 1.0 for t in rocs}
+
+    sorted_tickers = sorted(rocs, key=rocs.get, reverse=True)
+    n = len(sorted_tickers)
+    top_n = max(1, n // 3)
+    bot_n = max(1, n // 3)
+    top_set = set(sorted_tickers[:top_n])
+    bot_set = set(sorted_tickers[-bot_n:])
+
+    result = {}
+    for t in rocs:
+        if t in top_set:
+            result[t] = MOMENTUM_TOP_BOOST
+        elif t in bot_set:
+            result[t] = MOMENTUM_BOT_PENALTY
+        else:
+            result[t] = 1.0
+    return result
+
+
+def get_atr_percentile(df, day_ts):
+    """
+    Get current ATR as percentile of recent ATR history.
+    Returns size multiplier based on volatility regime.
+    """
+    hist = df.loc[:day_ts]
+    if len(hist) < ATR_PERCENTILE_LOOKBACK + ATR_PERIOD:
+        return 1.0
+
+    atr_series = hist["atr"].dropna().tail(ATR_PERCENTILE_LOOKBACK)
+    if len(atr_series) < 10:
+        return 1.0
+
+    current_atr = atr_series.iloc[-1]
+    pctl = (atr_series < current_atr).sum() / len(atr_series) * 100
+
+    if pctl >= ATR_HIGH_PCTL:
+        return ATR_HIGH_SIZE_MULT
+    elif pctl <= ATR_LOW_PCTL:
+        return ATR_LOW_SIZE_MULT
+    return 1.0
+
+
 # ─────────────────────────────────────────────────────────────
 # SIGNAL GENERATION
 # ─────────────────────────────────────────────────────────────
@@ -485,6 +560,7 @@ def generate_signals(data, start_date, end_date):
         day_ts = pd.Timestamp(day)
         vix = get_vix_level(data, day_ts)
         market_regime = detect_market_regime(data)
+        momentum_mults = compute_momentum_ranks(ticker_data, day_ts)
 
         for ticker in WATCHLIST:
             if ticker not in ticker_data:
@@ -510,6 +586,20 @@ def generate_signals(data, start_date, end_date):
             if ticker in open_positions:
                 pos = open_positions[ticker]
                 days_held = (day_ts - pos["entry_date"]).days
+
+                # Gap-down exit: if open gaps down significantly, exit immediately
+                if days_held >= 1 and len(hist) >= 2:
+                    prev_close = hist.iloc[-2]["Close"]
+                    open_price = current["Open"]
+                    gap_pct = (open_price - prev_close) / prev_close
+                    if gap_pct <= GAP_DOWN_EXIT_PCT:
+                        signals.append({
+                            "date": day_ts, "ticker": ticker, "action": "SELL",
+                            "price": open_price, "stop_loss": None,
+                            "take_profit": None, "position_size": 0,
+                        })
+                        del open_positions[ticker]
+                        continue
 
                 # Earnings avoidance: exit swing trades before earnings
                 dte = days_to_earnings(ticker, day_ts)
@@ -635,6 +725,10 @@ def generate_signals(data, start_date, end_date):
             if sector_q == "leading":
                 sector_size_mult = SECTOR_LEADING_BOOST
 
+            # ── MOMENTUM & VOLATILITY MULTIPLIERS ──
+            momentum_mult = momentum_mults.get(ticker, 1.0)
+            atr_vol_mult = get_atr_percentile(df, day_ts)
+
             # ── FIND SUPPORT/RESISTANCE ──
             supports, resistances = find_support_resistance(hist)
             if not supports or not resistances:
@@ -671,10 +765,11 @@ def generate_signals(data, start_date, end_date):
                 else:
                     continue  # R/R not good enough
 
-                # Position sizing: risk-adjust based on VIX and sector rotation
+                # Position sizing: risk-adjust based on VIX, sector, momentum, vol regime
                 effective_risk = RISK_PCT * 1.3 if vix < VIX_LOW_THRESHOLD else RISK_PCT
                 risk_amount = capital * effective_risk
-                position_size = int(risk_amount / risk * sector_size_mult)
+                size_mult = sector_size_mult * momentum_mult * atr_vol_mult
+                position_size = int(risk_amount / risk * size_mult)
                 if position_size <= 0:
                     continue
                 position_size = min(position_size, MAX_POSITION_SHARES)

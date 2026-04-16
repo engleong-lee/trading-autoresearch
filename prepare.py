@@ -112,8 +112,8 @@ def download_data(force=False):
         except Exception as e:
             print(f"ERROR: {e}")
 
-    # Also download SPY and QQQ for market regime detection
-    for bench in ["SPY", "QQQ"]:
+    # Also download SPY, QQQ, and sector ETFs
+    for bench in ["SPY", "QQQ", "XLK", "XLF", "XLY"]:
         if bench not in WATCHLIST:
             print(f"  {bench} (benchmark)...", end=" ", flush=True)
             try:
@@ -173,7 +173,7 @@ def load_all_data():
         except FileNotFoundError:
             print(f"Warning: No data for {ticker}, skipping")
     # Also load benchmarks
-    for extra in ["SPY", "QQQ", "VIX"]:
+    for extra in ["SPY", "QQQ", "VIX", "XLK", "XLF", "XLY"]:
         try:
             data[extra] = load_data(extra)
         except FileNotFoundError:

@@ -49,6 +49,10 @@ ENTRY_OFFSET_PCT = 0.002
 # Take-profit offset from resistance (0.3% below resistance)
 TP_OFFSET_PCT = 0.004
 
+# Partial profit taking
+PARTIAL_EXIT_PCT = 0.5        # Take this fraction at intermediate target
+PARTIAL_TARGET_PCT = 0.5      # Intermediate target = entry + this * (TP - entry)
+
 # Risk per trade
 RISK_PCT = 0.005  # 0.5% of capital
 MAX_POSITION_SHARES = 600    # Cap shares per trade
@@ -473,7 +477,7 @@ def generate_signals(data, start_date, end_date):
     trading_days = sorted(all_dates)
 
     # Track open positions for signal generation
-    open_positions = {}  # ticker -> {entry_date, entry_price, stop_loss, strategy_type}
+    open_positions = {}  # ticker -> {entry_date, entry_price, stop_loss, strategy_type, shares, partial_target, took_partial}
     capital = INITIAL_CAPITAL
 
     for day in trading_days:
@@ -517,6 +521,29 @@ def generate_signals(data, start_date, end_date):
                         })
                         del open_positions[ticker]
                         continue
+
+                # Partial profit taking: sell half at intermediate target
+                if (pos["strategy_type"] == "swing" and
+                    not pos.get("took_partial", False) and
+                    pos.get("partial_target") is not None and
+                    price >= pos["partial_target"]):
+                    partial_shares = int(pos.get("shares", 0) * PARTIAL_EXIT_PCT)
+                    if partial_shares > 0 and partial_shares < pos.get("shares", 0):
+                        signals.append({
+                            "date": day_ts, "ticker": ticker, "action": "SELL",
+                            "price": price, "stop_loss": None,
+                            "take_profit": None, "position_size": partial_shares,
+                        })
+                        pos["took_partial"] = True
+                        pos["shares"] -= partial_shares
+                        # Move stop to breakeven after partial
+                        if pos["entry_price"] > pos["stop_loss"]:
+                            pos["stop_loss"] = pos["entry_price"]
+                            signals.append({
+                                "date": day_ts, "ticker": ticker, "action": "UPDATE_STOP",
+                                "price": price, "stop_loss": pos["entry_price"],
+                                "take_profit": None, "position_size": 0,
+                            })
 
                 # Swing trade: exit if close below mid EMA
                 if pos["strategy_type"] == "swing" and days_held >= 1:
@@ -684,6 +711,9 @@ def generate_signals(data, start_date, end_date):
                     "entry_price": entry_price,
                     "stop_loss": stop_loss,
                     "strategy_type": strategy_type,
+                    "shares": position_size,
+                    "partial_target": entry_price + PARTIAL_TARGET_PCT * (take_profit - entry_price) if take_profit_signal is not None else None,
+                    "took_partial": False,
                 }
 
     return pd.DataFrame(signals) if signals else pd.DataFrame(

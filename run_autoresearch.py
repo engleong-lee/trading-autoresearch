@@ -27,6 +27,8 @@ SEARCH_SPACE = {
     "SWING_MAX_HOLD_DAYS": [1, 2, 3],
     "SWING_MIN_RR": [0.8, 1.0, 1.2, 1.5],
     "SWING_TRAIL_PROFIT_PCT": [0.02, 0.03, 0.04, 0.05],
+    "MAX_PER_SECTOR": [2, 3, 4, 5],
+    "STOP_COOLDOWN_DAYS": [0, 1, 2, 3],
 }
 
 # How many params to vary per experiment (1-4)

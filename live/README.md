@@ -2,6 +2,70 @@
 
 This folder contains a standalone daily trading bot that executes the R2 autoresearch strategy via the Alpaca paper trading API. No n8n required.
 
+---
+
+## R7 Automation (Postgres + News + Telegram) — for Claude Cowork
+
+`automation.py` and `weekly_summary.py` are the production automation built on top
+of `trader.py`. They run the **R7** strategy, log results to Postgres, cross-check
+news sentiment, and notify via Telegram. Designed to be scheduled by Claude Cowork.
+
+### Modules
+| File | Purpose |
+|------|---------|
+| `automation.py` | Daily job: signals → news veto → Alpaca orders → DB report → Telegram |
+| `weekly_summary.py` | Sunday job: aggregate the week's rows → DB + Telegram |
+| `db.py` | Postgres helpers (schema `pmvwft68q3g8g19`) |
+| `news.py` | Supplementary news scoring + bearish veto |
+| `notify.py` | Telegram broadcast + auto-capture subscribers via `getUpdates` |
+| `config.py` | Env-driven config (Alpaca / Postgres / Telegram / risk) |
+| `.env.example` | Copy to `.env` and fill in secrets |
+
+### Configuration
+All secrets read from env (or `live/.env`), falling back to defaults in `config.py`.
+The one value you MUST supply is `TELEGRAM_BOT_TOKEN` (from @BotFather → befreedombot
+→ API Token). See `.env.example`.
+
+### Risk sizing (overrides strategy sizing)
+- **1% of account equity risk per ticker** (`RISK_PER_TRADE=0.01`)
+- **Max 5 concurrent positions** = 5% total portfolio risk (`MAX_POSITIONS=5`)
+- Qty = `floor(0.01 * equity / (entry - stop_loss))`, capped by buying power.
+
+### News handling (supplementary only)
+For each BUY, a per-ticker news score in [-1, +1] is computed from `news_signals`
+(confidence × magnitude weighted). A BUY is vetoed (`SKIP_BEARISH_NEWS`) **only** if
+score ≤ -0.6 **and** there is a recent high-impact bearish item. News never forces a
+buy and never affects SELL/UPDATE_STOP.
+
+### Database tables (schema `pmvwft68q3g8g19` in DB `root_db`)
+- `ticker_watchlist` (read) — active tickers.
+- `news_signals` (read) — sentiment, matched via `entities.tickers`.
+- `autoresearch_trading_result` (write) — one upserted row per US trading date.
+- `autoresearch_trading_weekly_summary` (write) — one row per Sunday.
+- `telegram_subscribers` (auto-created) — chat_ids captured from `getUpdates`.
+
+### Telegram: adding recipients
+A bot can only message users who have pressed **Start** on it. On every run the job
+calls `getUpdates` and upserts any new chat_ids into `telegram_subscribers`, then
+broadcasts to all active subscribers. So: ask each recipient to open the bot and tap
+Start once. Optionally seed via `TELEGRAM_SEED_CHAT_IDS`.
+
+### Run manually
+```bash
+python -m live.automation --dry-run   # preview signals + report, no orders/DB/Telegram
+python -m live.automation             # live paper run (orders + DB + Telegram)
+python -m live.automation --status    # Alpaca account/positions
+python -m live.weekly_summary         # build + persist + send weekly summary
+```
+
+### Claude Cowork schedules (times in MYT = UTC+8)
+- **Daily** (Mon–Fri, ~30 min after US open): `10:00 PM MYT` (US DST) — `python -m live.automation`
+  - The `get_clock()` guard makes weekend/holiday runs safe (logged as `market_closed`).
+  - During US standard time (Nov–Mar) shift to `11:00 PM MYT`.
+- **Weekly** (Sunday): any time — `python -m live.weekly_summary`
+
+---
+
 ## How It Works
 
 1. Fetches latest daily OHLCV data from Yahoo Finance (free)

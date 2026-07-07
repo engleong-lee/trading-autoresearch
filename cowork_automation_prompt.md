@@ -41,6 +41,11 @@ NOT rewrite the strategy or the pipeline; only run/fix/configure it.
 3. Verify: `python -m live.automation --status` (should print paper account
    equity/positions) and `python -m live.automation --dry-run` (should print
    today's signals + report with NO orders/DB/Telegram writes).
+4. OPTIONAL one-time end-to-end check (run once, during US market hours
+   10pm–4am MYT): `python -m live.automation`. Confirms real paper orders submit,
+   a `autoresearch_trading_result` row is written, and Telegram is delivered.
+   Note: this places paper trades and notifies users — the scheduled 10pm job does
+   the same thing, so skip this if you'd rather let the first 10pm run be the test.
 
 ## SCHEDULES (create these in Cowork; times in MYT = UTC+8)
 

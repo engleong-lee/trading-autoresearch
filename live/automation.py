@@ -323,6 +323,13 @@ def run(dry_run=False):
         except Exception as e:
             log.warning("Trade-history sync failed (non-fatal): %s", e)
 
+        # Regenerate the interactive Trade Explorer HTML from the fresh history.
+        try:
+            from live import trade_explorer
+            trade_explorer.generate(str(Path(__file__).parent / "trade_explorer.html"))
+        except Exception as e:
+            log.warning("Trade Explorer regeneration failed (non-fatal): %s", e)
+
     conn.close()
     log.info("SESSION COMPLETE")
 

@@ -10,3 +10,4 @@ download.log
 test.log
 strategy_best.py
 autoresearch_log.json
+live/trade_explorer.html

@@ -37,6 +37,7 @@ from live import db, news, notify
 from live.trader import (
     get_alpaca_client, get_current_positions, get_open_orders,
     place_bracket_order, place_market_sell, show_status, get_todays_signals,
+    cancel_unfilled_entries, cancel_orders_for_symbol, wait_orders_cleared,
 )
 
 # ─────────────────────────────────────────────────────────────
@@ -206,6 +207,16 @@ def run(dry_run=False):
     positions = get_current_positions(client)
     log.info("Current positions: %d", len(positions))
 
+    # Cancel stale unfilled entry orders from prior days so today's signals place
+    # fresh GTC brackets (a resting GTC buy-limit would otherwise fill later on a
+    # signal that is no longer valid). Protective legs on held positions are kept.
+    try:
+        stale = cancel_unfilled_entries(client, dry_run=dry_run)
+        if stale:
+            log.info("Canceled %d stale unfilled entr(y/ies): %s", len(stale), stale)
+    except Exception as e:
+        log.warning("Cancel unfilled entries failed: %s", e)
+
     # Symbols that already have exposure OR a live open order (avoid duplicate buys)
     open_order_symbols = set()
     try:
@@ -225,9 +236,14 @@ def run(dry_run=False):
         for _, sig in sells.iterrows():
             t = sig["ticker"]
             if t in positions:
+                # Cancel resting GTC protective legs first, confirm they clear, then
+                # market-sell — avoids a rejected exit (reserved qty) and prevents an
+                # orphaned stop from firing on a position we no longer hold.
+                cancel_orders_for_symbol(client, t, dry_run=dry_run)
+                wait_orders_cleared(client, t, dry_run=dry_run)
                 qty = positions[t]["qty"]
                 place_market_sell(client, t, qty, dry_run=dry_run)
-                orders_summary.append(f"SELL {qty} {t} @ market (exit)")
+                orders_summary.append(f"SELL {qty} {t} @ market (exit; protective legs canceled)")
                 decisions.append(dict(ticker=t, signal="SELL", emoji="➖", score=0.0,
                                       decision="EXECUTE", reasoning="Strategy exit"))
             else:
@@ -322,7 +338,8 @@ def _place_limit_stop(client, ticker, qty, entry, stop, dry_run):
     try:
         req = LimitOrderRequest(
             symbol=ticker, qty=qty, side=OrderSide.BUY, type=OrderType.LIMIT,
-            time_in_force=TimeInForce.DAY, limit_price=round(entry, 2),
+            time_in_force=TimeInForce.GTC,  # GTC: entry rests until hit; stop persists until triggered
+            limit_price=round(entry, 2),
             order_class=OrderClass.OTO,
             stop_loss=StopLossRequest(stop_price=round(stop, 2)),
         )

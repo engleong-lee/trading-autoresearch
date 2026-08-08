@@ -199,7 +199,7 @@ def place_bracket_order(client, ticker, qty, entry_price, stop_loss, take_profit
             qty=qty,
             side=OrderSide.BUY,
             type=OrderType.LIMIT,
-            time_in_force=TimeInForce.DAY,
+            time_in_force=TimeInForce.GTC,  # GTC: entry rests until hit; TP/SL persist (OCO) until triggered
             limit_price=round(entry_price, 2),
             order_class=OrderClass.BRACKET,
             stop_loss=StopLossRequest(stop_price=round(stop_loss, 2)),
@@ -211,6 +211,58 @@ def place_bracket_order(client, ticker, qty, entry_price, stop_loss, take_profit
     except Exception as e:
         log.error(f"  Order failed: {e}")
         return None
+
+
+def cancel_order_safe(client, order_id):
+    """Cancel one order by id; never raises."""
+    try:
+        client.cancel_order_by_id(order_id)
+        return True
+    except Exception as e:
+        log.warning(f"  Cancel failed for {order_id}: {e}")
+        return False
+
+
+def cancel_unfilled_entries(client, dry_run=False):
+    """Cancel resting BUY entry orders that have not filled (stale prior-day GTC
+    limits). Canceling a bracket entry also cancels its child TP/SL legs, so this
+    only targets top-level buy orders. Protective SELL legs on *filled* positions
+    are left untouched."""
+    stale = [o for o in get_open_orders(client) if o.side == OrderSide.BUY]
+    for o in stale:
+        log.info(f"{'[DRY RUN] ' if dry_run else ''}Cancel stale unfilled entry: "
+                 f"BUY {o.qty} {o.symbol} (id={o.id}, status={o.status.value})")
+        if not dry_run:
+            cancel_order_safe(client, o.id)
+    return [o.symbol for o in stale]
+
+
+def cancel_orders_for_symbol(client, symbol, dry_run=False):
+    """Cancel all open orders for `symbol` — used to clear resting protective legs
+    before a strategy market-sell so the exit isn't rejected for reserved qty and
+    no orphaned stop remains afterward."""
+    matching = [o for o in get_open_orders(client) if o.symbol == symbol]
+    for o in matching:
+        log.info(f"{'[DRY RUN] ' if dry_run else ''}Cancel open {o.side.value} "
+                 f"{o.order_type.value} for {symbol} (id={o.id})")
+        if not dry_run:
+            cancel_order_safe(client, o.id)
+    return len(matching)
+
+
+def wait_orders_cleared(client, symbol, timeout=5.0, dry_run=False):
+    """Poll until `symbol` has no open orders (cancellations propagated), so a
+    following market sell isn't rejected for reserved quantity."""
+    if dry_run:
+        return True
+    import time as _t
+    deadline = _t.time() + timeout
+    while _t.time() < deadline:
+        if not any(o.symbol == symbol for o in get_open_orders(client)):
+            return True
+        _t.sleep(0.4)
+    log.warning(f"  Orders for {symbol} still open after {timeout:.1f}s; proceeding")
+    return False
 
 
 def place_market_sell(client, ticker, qty, dry_run=False):

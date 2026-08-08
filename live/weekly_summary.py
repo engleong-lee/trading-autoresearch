@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from live.config import LOG_FILE
-from live import db, notify
+from live import db, notify, trade_history
 from live.trader import get_alpaca_client, get_current_positions
 
 log_path = Path(__file__).parent.parent / LOG_FILE
@@ -107,6 +107,7 @@ def run():
     log.info("Found %d daily rows for %s..%s", len(rows), monday, friday)
 
     account, positions = None, {}
+    client = None
     try:
         client = get_alpaca_client()
         acct = client.get_account()
@@ -117,6 +118,23 @@ def run():
         log.warning("Alpaca fetch failed: %s", e)
 
     summary = build_weekly_summary(rows, account, positions, monday, friday)
+
+    # Closed-trade round-trips for the week (from the order-lifecycle table).
+    # Refresh the table from Alpaca first so exits that just happened are captured.
+    try:
+        if client is not None:
+            trade_history.sync_orders(conn, client)
+        all_filled = db.get_all_filled_orders(conn)
+        trips, _ = trade_history.reconstruct_trips(all_filled)
+        week_trips = [t for t in trips if t["exit_at"]
+                      and monday <= t["exit_at"].date() <= friday]
+        st = trade_history.stats(week_trips)
+        section = trade_history.render_markdown(
+            week_trips, st, title=f"Closed Trades ({monday} → {friday})")
+        summary = summary + "\n\n" + section
+    except Exception as e:
+        log.warning("Closed-trade section failed: %s", e)
+
     db.insert_weekly_summary(conn, summary)
 
     try:

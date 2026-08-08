@@ -172,3 +172,104 @@ def deactivate_subscriber(conn, chat_id):
             (chat_id,),
         )
     conn.commit()
+
+
+# ─────────────────────────────────────────────────────────────
+# TRADE HISTORY (full order lifecycle — one row per Alpaca order/leg)
+# ─────────────────────────────────────────────────────────────
+
+def ensure_trade_history_table(conn):
+    """Create autoresearch_trade_history if absent. One row per Alpaca order
+    (parent entry + each bracket leg), keyed by order_id for idempotent upserts."""
+    with conn.cursor() as cur:
+        cur.execute(
+            f'''CREATE TABLE IF NOT EXISTS {_q("autoresearch_trade_history")} (
+                id                BIGSERIAL PRIMARY KEY,
+                created_at        TIMESTAMP DEFAULT now(),
+                updated_at        TIMESTAMP DEFAULT now(),
+                account           TEXT,
+                order_id          TEXT UNIQUE NOT NULL,
+                client_order_id   TEXT,
+                parent_order_id   TEXT,
+                leg_role          TEXT,
+                symbol            TEXT,
+                side              TEXT,
+                order_type        TEXT,
+                order_class       TEXT,
+                time_in_force     TEXT,
+                qty               NUMERIC,
+                filled_qty        NUMERIC,
+                limit_price       NUMERIC,
+                stop_price        NUMERIC,
+                filled_avg_price  NUMERIC,
+                status            TEXT,
+                submitted_at      TIMESTAMP,
+                filled_at         TIMESTAMP,
+                canceled_at       TIMESTAMP,
+                expired_at        TIMESTAMP,
+                replaced_at       TIMESTAMP,
+                raw               JSONB
+            )'''
+        )
+        cur.execute(
+            f'CREATE INDEX IF NOT EXISTS idx_ath_symbol_filled '
+            f'ON {_q("autoresearch_trade_history")} (symbol, filled_at)'
+        )
+    conn.commit()
+
+
+def upsert_order_row(conn, row):
+    """Insert or update one order-lifecycle row (idempotent on order_id).
+
+    `row` is a dict with keys matching the table columns (minus id/created_at).
+    Mutable fields (status/fills/timestamps/raw) are refreshed on conflict so an
+    order that was 'new' yesterday becomes 'filled'/'expired' today.
+    """
+    now = datetime.now()
+    cols = ["account", "order_id", "client_order_id", "parent_order_id", "leg_role",
+            "symbol", "side", "order_type", "order_class", "time_in_force",
+            "qty", "filled_qty", "limit_price", "stop_price", "filled_avg_price",
+            "status", "submitted_at", "filled_at", "canceled_at", "expired_at",
+            "replaced_at", "raw"]
+    vals = [row.get(c) for c in cols]
+    placeholders = ", ".join(["%s"] * len(cols))
+    updatable = ["status", "filled_qty", "filled_avg_price", "filled_at",
+                 "canceled_at", "expired_at", "replaced_at", "raw"]
+    set_clause = ", ".join([f"{c}=EXCLUDED.{c}" for c in updatable]) + ", updated_at=now()"
+    with conn.cursor() as cur:
+        cur.execute(
+            f'INSERT INTO {_q("autoresearch_trade_history")} '
+            f'(created_at, updated_at, {", ".join(cols)}) '
+            f'VALUES (%s, %s, {placeholders}) '
+            f'ON CONFLICT (order_id) DO UPDATE SET {set_clause}',
+            [now, now] + vals,
+        )
+    conn.commit()
+
+
+def get_filled_orders_between(conn, start_date, end_date):
+    """Return filled order rows (any side/leg) whose fill fell in [start,end] inclusive,
+    ordered by fill time. Used to reconstruct round-trips for reporting."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            f'SELECT symbol, side, leg_role, order_type, order_class, '
+            f'       filled_qty, filled_avg_price, filled_at, order_id, parent_order_id '
+            f'FROM {_q("autoresearch_trade_history")} '
+            f'WHERE status = %s AND filled_at::date >= %s AND filled_at::date <= %s '
+            f'ORDER BY filled_at',
+            ("filled", start_date, end_date),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+
+def get_all_filled_orders(conn):
+    """Return every filled order row ordered by fill time (for full round-trip history)."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            f'SELECT symbol, side, leg_role, order_type, order_class, '
+            f'       filled_qty, filled_avg_price, filled_at, order_id, parent_order_id '
+            f'FROM {_q("autoresearch_trade_history")} '
+            f'WHERE status = %s ORDER BY filled_at',
+            ("filled",),
+        )
+        return [dict(r) for r in cur.fetchall()]

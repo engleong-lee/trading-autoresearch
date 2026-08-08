@@ -298,6 +298,15 @@ def run(dry_run=False):
     else:
         log.info("\n%s", report)
 
+    # Refresh the order-lifecycle history table (for trade debugging + weekly stats).
+    # Fully guarded: this is reporting only and must never affect the trading path.
+    if not dry_run:
+        try:
+            from live import trade_history
+            trade_history.sync_orders(conn, client)
+        except Exception as e:
+            log.warning("Trade-history sync failed (non-fatal): %s", e)
+
     conn.close()
     log.info("SESSION COMPLETE")
 

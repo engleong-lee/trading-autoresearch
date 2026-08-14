@@ -93,6 +93,7 @@ SECTOR_MAP = {
     "VGK": None,
 }
 MAX_PER_SECTOR = 3            # Max concurrent positions in same sector
+MAX_NEW_POSITIONS_PER_DAY = 3 # Max new entries per day across all tickers
 
 # Stop-loss cooldown
 STOP_COOLDOWN_DAYS = 0        # Skip re-entry for N days after stop-out (0=disabled)
@@ -429,6 +430,7 @@ def generate_signals(data, start_date, end_date):
         day_ts = pd.Timestamp(day)
         vix = get_vix_level(data, day_ts)
         market_regime = detect_market_regime(data, day_ts)
+        daily_new = 0
 
         for ticker in WATCHLIST:
             if ticker not in ticker_data:
@@ -618,6 +620,11 @@ def generate_signals(data, start_date, end_date):
             if (strategy_type == "trend" and rr_ratio < TREND_MIN_RR) or \
                (strategy_type != "trend" and rr_ratio < SWING_MIN_RR):
                 continue
+
+            # Daily new-position cap
+            if daily_new >= MAX_NEW_POSITIONS_PER_DAY:
+                continue
+            daily_new += 1
 
             # Position sizing: risk-adjust based on VIX
             effective_risk = RISK_PCT * 1.3 if vix < VIX_LOW_THRESHOLD else RISK_PCT

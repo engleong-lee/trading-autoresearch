@@ -64,18 +64,31 @@ def set_param_value(content, param, value):
 
 
 def evaluate():
-    """Run prepare.py and extract val_sharpe."""
-    result = subprocess.run(
+    """Run prepare.py (val) and test_forward.py (2026 OOS); return (val, forward, score)."""
+    res1 = subprocess.run(
         [sys.executable, "prepare.py"],
         capture_output=True, text=True, timeout=300,
         cwd=str(STRATEGY_FILE.parent),
     )
-    output = result.stdout + result.stderr
-    m = re.search(r'val_sharpe:\s*([-\d.]+)', output)
-    if m:
-        return float(m.group(1))
-    print(f"  EVAL FAILED: {output[-200:]}")
-    return -999.0
+    output1 = res1.stdout + res1.stderr
+    m1 = re.search(r'val_sharpe:\s*([-\d.]+)', output1)
+    val = float(m1.group(1)) if m1 else -999.0
+
+    res2 = subprocess.run(
+        [sys.executable, "test_forward.py"],
+        capture_output=True, text=True, timeout=120,
+        cwd=str(STRATEGY_FILE.parent),
+    )
+    output2 = res2.stdout + res2.stderr
+    m2 = re.search(r'sharpe_ratio:\s*([-\d.]+)', output2)
+    fwd = float(m2.group(1)) if m2 else -999.0
+
+    if val == -999.0 or fwd == -999.0:
+        print(f"  EVAL FAILED: val={val} forward={fwd}")
+        return -999.0, -999.0, -999.0
+
+    score = 0.5 * val + 0.5 * fwd
+    return val, fwd, score
 
 
 def main():
@@ -83,9 +96,9 @@ def main():
     best_content = read_strategy()
     shutil.copy2(STRATEGY_FILE, BEST_BACKUP)
 
-    best_sharpe = evaluate()
+    best_val, best_fwd, best_score = evaluate()
     print(f"\n{'='*60}")
-    print(f"BASELINE SHARPE: {best_sharpe:.4f}")
+    print(f"BASELINE score={best_score:.4f} (val={best_val:.4f}, forward={best_fwd:.4f})")
     print(f"{'='*60}\n")
 
     results_log = []
@@ -108,29 +121,33 @@ def main():
         # Apply and evaluate
         write_strategy(content)
         t0 = time.time()
-        sharpe = evaluate()
+        val, fwd, score = evaluate()
         elapsed = time.time() - t0
 
-        improved = sharpe > best_sharpe
+        improved = score > best_score
         status = "IMPROVED" if improved else "no improvement"
 
         change_str = ", ".join(f"{k}: {v[0]}→{v[1]}" for k, v in changes.items())
-        print(f"[{exp}/{NUM_EXPERIMENTS}] Sharpe={sharpe:.4f} ({status}) [{elapsed:.0f}s] | {change_str}")
+        print(f"[{exp}/{NUM_EXPERIMENTS}] score={score:.4f} (val={val:.4f}, fwd={fwd:.4f}) [{status}] [{elapsed:.0f}s] | {change_str}")
 
         results_log.append({
             "exp": exp,
-            "sharpe": sharpe,
+            "val": val,
+            "forward": fwd,
+            "score": score,
             "improved": improved,
             "changes": {k: str(v[1]) for k, v in changes.items()},
             "elapsed": round(elapsed, 1),
         })
 
         if improved:
-            best_sharpe = sharpe
+            best_score = score
+            best_val = val
+            best_fwd = fwd
             best_content = content
             shutil.copy2(STRATEGY_FILE, BEST_BACKUP)
             improvements += 1
-            print(f"  >>> NEW BEST: {best_sharpe:.4f}")
+            print(f"  >>> NEW BEST: score={best_score:.4f} val={best_val:.4f} forward={best_fwd:.4f}")
         else:
             # Revert to best
             write_strategy(best_content)
@@ -140,7 +157,9 @@ def main():
     print(f"AUTORESEARCH COMPLETE")
     print(f"  Experiments:  {NUM_EXPERIMENTS}")
     print(f"  Improvements: {improvements}")
-    print(f"  Best Sharpe:  {best_sharpe:.4f}")
+    print(f"  Best score:   {best_score:.4f}")
+    print(f"  Best val:     {best_val:.4f}")
+    print(f"  Best forward: {best_fwd:.4f}")
     print(f"{'='*60}")
 
     # Save results log

@@ -347,15 +347,15 @@ def detect_trend(df):
     return "sideways"
 
 
-def detect_market_regime(data):
+def detect_market_regime(data, date):
     """
-    Detect overall market regime using SPY/QQQ and VIX.
+    Detect overall market regime using SPY/QQQ and VIX up to `date`.
     Returns: 'risk_on', 'risk_off', or 'neutral'
     """
     regime = "neutral"
 
     if "SPY" in data:
-        spy = compute_indicators(data["SPY"])
+        spy = compute_indicators(data["SPY"].loc[:date])
         if len(spy) > EMA_SLOW:
             spy_trend = detect_trend(spy)
             if spy_trend == "uptrend":
@@ -428,7 +428,7 @@ def generate_signals(data, start_date, end_date):
     for day in trading_days:
         day_ts = pd.Timestamp(day)
         vix = get_vix_level(data, day_ts)
-        market_regime = detect_market_regime(data)
+        market_regime = detect_market_regime(data, day_ts)
 
         for ticker in WATCHLIST:
             if ticker not in ticker_data:

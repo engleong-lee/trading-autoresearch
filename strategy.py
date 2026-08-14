@@ -92,7 +92,7 @@ SECTOR_MAP = {
     "AMZN": "XLY",
     "VGK": None,
 }
-MAX_PER_SECTOR = 5            # Max concurrent positions in same sector
+MAX_PER_SECTOR = 3            # Max concurrent positions in same sector
 
 # Stop-loss cooldown
 STOP_COOLDOWN_DAYS = 0        # Skip re-entry for N days after stop-out (0=disabled)

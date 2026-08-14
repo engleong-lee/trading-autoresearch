@@ -31,26 +31,26 @@ EMA_SLOW = 200
 
 # ATR for stop-loss calculation
 ATR_PERIOD = 14
-ATR_STOP_MULTIPLIER = 1.0   # Stop = support - ATR * multiplier
+ATR_STOP_MULTIPLIER = 0.8   # Stop = support - ATR * multiplier
 
 # Swing trading parameters
 SWING_MIN_RR = 1.5           # Minimum reward/risk ratio for swing entries
-SWING_MAX_HOLD_DAYS = 10     # Max hold days for swing trades
-SWING_TRAIL_PROFIT_PCT = 0.03  # Activate trailing stop after this profit %
-SWING_TRAIL_ATR_MULT = 0.8    # Trailing stop distance in ATR units
+SWING_MAX_HOLD_DAYS = 7     # Max hold days for swing trades
+SWING_TRAIL_PROFIT_PCT = 0.02  # Activate trailing stop after this profit %
+SWING_TRAIL_ATR_MULT = 1.0    # Trailing stop distance in ATR units
 
 # Trend trading parameters
 TREND_MIN_RR = 3.0           # Minimum reward/risk for trend initial entry
 TREND_TRAIL_ATR_MULT = 1.5   # Trail stop at N * ATR below recent support
 
 # Entry offset from support (0.3% above support)
-ENTRY_OFFSET_PCT = 0.002
+ENTRY_OFFSET_PCT = 0.001
 
 # Take-profit offset from resistance (0.3% below resistance)
 TP_OFFSET_PCT = 0.005
 
 # Risk per trade
-RISK_PCT = 0.005  # 0.5% of capital
+RISK_PCT = 0.01  # 0.5% of capital
 MAX_POSITION_SHARES = 600    # Cap shares per trade
 
 # Market regime filter
@@ -61,7 +61,7 @@ VIX_LOW_THRESHOLD = 15       # Below this = aggressive (normal/larger positions)
 INITIAL_CAPITAL = 100_000.0
 
 # Support/Resistance lookback
-SR_LOOKBACK = 60             # Days to look back for S/R levels
+SR_LOOKBACK = 90             # Days to look back for S/R levels
 SR_MIN_TOUCHES = 2           # Minimum touches to qualify as S/R
 
 # Pattern detection
@@ -78,7 +78,7 @@ EARNINGS_EXIT_DAYS = 1          # Exit swing trades N days before earnings
 
 # Confirmation filters
 RSI_OVERBOUGHT = 999          # Disabled — RSI filter not helpful with short holds
-VOL_RATIO_MIN = 0.3            # Minimum volume ratio for entry
+VOL_RATIO_MIN = 0.2            # Minimum volume ratio for entry
 MACD_HIST_ATR_MULT = -1.0      # Skip if MACD hist < this * ATR
 
 # SPY regime gate
@@ -92,7 +92,7 @@ SECTOR_MAP = {
     "AMZN": "XLY",
     "VGK": None,
 }
-MAX_PER_SECTOR = 2            # Max concurrent positions in same sector
+MAX_PER_SECTOR = 5            # Max concurrent positions in same sector
 
 # Stop-loss cooldown
 STOP_COOLDOWN_DAYS = 0        # Skip re-entry for N days after stop-out (0=disabled)

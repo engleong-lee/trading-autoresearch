@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conservative execution sanity check: enter at next day's open."""
+"""Next-day limit-order execution sanity check for strategy signals."""
 
 import importlib.util
 import pandas as pd
@@ -7,6 +7,7 @@ import numpy as np
 from pathlib import Path
 
 ROOT = Path(__file__).parent
+
 
 def load_module(name, path):
     spec = importlib.util.spec_from_file_location(name, str(path))
@@ -16,11 +17,18 @@ def load_module(name, path):
 
 
 prepare = load_module("prepare", ROOT / "prepare.py")
-strategy = load_module("strategy", ROOT / "strategy.py")
 
 
-def adjust_signals(signals, data):
-    """Shift entries to next day's open and recompute position size."""
+def load_data():
+    return prepare.load_all_data()
+
+
+def load_strategy():
+    return load_module("strategy", ROOT / "strategy.py")
+
+
+def adjust_signals(signals, data, strategy_mod):
+    """Shift entries to next-day limit fills and recompute position size."""
     rows = []
     for _, sig in signals.iterrows():
         ticker = sig["ticker"]
@@ -45,7 +53,7 @@ def adjust_signals(signals, data):
         if not np.isfinite(risk_per_share) or risk_per_share <= 0:
             continue
 
-        risk_amount = strategy.INITIAL_CAPITAL * strategy.RISK_PCT
+        risk_amount = strategy_mod.INITIAL_CAPITAL * strategy_mod.RISK_PCT
         shares = int(risk_amount / risk_per_share)
         if shares <= 0:
             continue
@@ -62,18 +70,41 @@ def adjust_signals(signals, data):
     return pd.DataFrame(rows)
 
 
-def run(label, start, end):
+def generate_realistic_signals(data, start, end):
+    """Generate signals using a fresh strategy module, then adjust to next-day fills."""
+    strategy_mod = load_strategy()
+    signals = strategy_mod.generate_signals(data, start, end)
+    adj = adjust_signals(signals, data, strategy_mod)
+    return adj
+
+
+def run_with_signals(adj, start, end, data):
+    """Run prepare.run_backtest on signals filtered to the requested period."""
+    start_ts = pd.Timestamp(start)
+    end_ts = pd.Timestamp(end)
+    mask = (adj["date"] >= start_ts) & (adj["date"] <= end_ts)
+    sub = adj.loc[mask].copy()
+    results = prepare.run_backtest(sub, data, start, end)
+    return results
+
+
+def run_realistic(start, end, data=None):
+    if data is None:
+        data = load_data()
+    adj = generate_realistic_signals(data, start, end)
+    return run_with_signals(adj, start, end, data)
+
+
+def print_results(label, results):
     print(f"\n{'='*60}")
     print(f"REALISTIC BACKTEST: {label}")
     print(f"{'='*60}")
-    data = prepare.load_all_data()
-    signals = strategy.generate_signals(data, start, end)
-    adj = adjust_signals(signals, data)
-    results = prepare.run_backtest(adj, data, start, end)
     for k, v in results.items():
         print(f"  {k}: {v}")
 
 
 if __name__ == "__main__":
-    run("TEST 2024-07 to 2025-12", "2024-07-01", "2025-12-31")
-    run("FORWARD 2026-01 to 2026-08", "2026-01-01", "2026-08-13")
+    data = load_data()
+    adj = generate_realistic_signals(data, "2022-11-01", "2026-08-13")
+    print_results("TEST 2024-07 to 2025-12", run_with_signals(adj, "2024-07-01", "2025-12-31", data))
+    print_results("FORWARD 2026-01 to 2026-08", run_with_signals(adj, "2026-01-01", "2026-08-13", data))

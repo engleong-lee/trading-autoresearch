@@ -65,8 +65,12 @@ def set_param_value(content, param, value):
     return re.sub(pattern2, rf'\g<1>{value}', content, count=1, flags=re.MULTILINE)
 
 
+DD_THRESHOLD = 5.0    # Penalize drawdowns beyond 5%
+DD_PENALTY = 0.20       # Sharpe points per %-point above threshold
+
+
 def evaluate():
-    """Run prepare.py (val), prepare.py --test (2024-25), and test_forward.py (2026); return scores."""
+    """Run val, test, and 2026 forward; return Sharpe, drawdown, and DD-penalized score."""
     res1 = subprocess.run(
         [sys.executable, "prepare.py"],
         capture_output=True, text=True, timeout=300,
@@ -75,6 +79,8 @@ def evaluate():
     output1 = res1.stdout + res1.stderr
     m1 = re.search(r'val_sharpe:\s*([-\d.]+)', output1)
     val = float(m1.group(1)) if m1 else -999.0
+    m1dd = re.search(r'val_maxdd:\s+([-\d.]+)', output1)
+    dd_val = float(m1dd.group(1)) if m1dd else -999.0
 
     res2 = subprocess.run(
         [sys.executable, "prepare.py", "--test"],
@@ -84,6 +90,8 @@ def evaluate():
     output2 = res2.stdout + res2.stderr
     m2 = re.search(r'\[TEST\].*?Sharpe Ratio:\s+([-\d.]+)', output2, re.DOTALL)
     test = float(m2.group(1)) if m2 else -999.0
+    m2dd = re.search(r'\[TEST\].*?Max Drawdown:\s+([-\d.]+)%', output2, re.DOTALL)
+    dd_test = float(m2dd.group(1)) if m2dd else -999.0
 
     res3 = subprocess.run(
         [sys.executable, "test_forward.py"],
@@ -93,14 +101,17 @@ def evaluate():
     output3 = res3.stdout + res3.stderr
     m3 = re.search(r'sharpe_ratio:\s*([-\d.]+)', output3)
     fwd = float(m3.group(1)) if m3 else -999.0
+    m3dd = re.search(r'max_drawdown_pct:\s+([-\d.]+)', output3)
+    dd_fwd = float(m3dd.group(1)) if m3dd else -999.0
 
-    if val == -999.0 or test == -999.0 or fwd == -999.0:
-        print(f"  EVAL FAILED: val={val} test={test} forward={fwd}")
-        return -999.0, -999.0, -999.0, -999.0
+    if any(v == -999.0 for v in [val, test, fwd, dd_val, dd_test, dd_fwd]):
+        print("  EVAL FAILED")
+        return -999.0, -999.0, -999.0, -999.0, -999.0, -999.0, -999.0
 
-    # Optimize for the worst case across all three OOS slices
-    score = min(val, test, fwd)
-    return val, test, fwd, score
+    worst_dd = min(dd_val, dd_test, dd_fwd)
+    penalty = max(0.0, abs(worst_dd) - DD_THRESHOLD) * DD_PENALTY
+    score = min(val, test, fwd) - penalty
+    return val, test, fwd, dd_val, dd_test, dd_fwd, score
 
 
 def main():
@@ -108,9 +119,10 @@ def main():
     best_content = read_strategy()
     shutil.copy2(STRATEGY_FILE, BEST_BACKUP)
 
-    best_val, best_test, best_fwd, best_score = evaluate()
+    best_val, best_test, best_fwd, best_dd_val, best_dd_test, best_dd_fwd, best_score = evaluate()
     print(f"\n{'='*60}")
     print(f"BASELINE score={best_score:.4f} (val={best_val:.4f}, test={best_test:.4f}, fwd={best_fwd:.4f})")
+    print(f"  dd val={best_dd_val:.2f}% test={best_dd_test:.2f}% fwd={best_dd_fwd:.2f}%")
     print(f"{'='*60}\n")
 
     results_log = []
@@ -133,20 +145,23 @@ def main():
         # Apply and evaluate
         write_strategy(content)
         t0 = time.time()
-        val, test, fwd, score = evaluate()
+        val, test, fwd, dd_val, dd_test, dd_fwd, score = evaluate()
         elapsed = time.time() - t0
 
         improved = score > best_score
         status = "IMPROVED" if improved else "no improvement"
 
         change_str = ", ".join(f"{k}: {v[0]}→{v[1]}" for k, v in changes.items())
-        print(f"[{exp}/{NUM_EXPERIMENTS}] score={score:.4f} (val={val:.4f}, test={test:.4f}, fwd={fwd:.4f}) [{status}] [{elapsed:.0f}s] | {change_str}")
+        print(f"[{exp}/{NUM_EXPERIMENTS}] score={score:.4f} (val={val:.4f}, test={test:.4f}, fwd={fwd:.4f}, dd={dd_val:.1f}/{dd_test:.1f}/{dd_fwd:.1f}) [{status}] [{elapsed:.0f}s] | {change_str}")
 
         results_log.append({
             "exp": exp,
             "val": val,
             "test": test,
             "forward": fwd,
+            "dd_val": dd_val,
+            "dd_test": dd_test,
+            "dd_fwd": dd_fwd,
             "score": score,
             "improved": improved,
             "changes": {k: str(v[1]) for k, v in changes.items()},
@@ -158,10 +173,13 @@ def main():
             best_val = val
             best_test = test
             best_fwd = fwd
+            best_dd_val = dd_val
+            best_dd_test = dd_test
+            best_dd_fwd = dd_fwd
             best_content = content
             shutil.copy2(STRATEGY_FILE, BEST_BACKUP)
             improvements += 1
-            print(f"  >>> NEW BEST: score={best_score:.4f} val={best_val:.4f} test={best_test:.4f} fwd={best_fwd:.4f}")
+            print(f"  >>> NEW BEST: score={best_score:.4f} val={best_val:.4f} test={best_test:.4f} fwd={best_fwd:.4f} dd={best_dd_val:.1f}/{best_dd_test:.1f}/{best_dd_fwd:.1f}")
         else:
             # Revert to best
             write_strategy(best_content)
@@ -175,6 +193,9 @@ def main():
     print(f"  Best val:     {best_val:.4f}")
     print(f"  Best test:    {best_test:.4f}")
     print(f"  Best forward: {best_fwd:.4f}")
+    print(f"  Best DD val:  {best_dd_val:.2f}%")
+    print(f"  Best DD test: {best_dd_test:.2f}%")
+    print(f"  Best DD fwd:  {best_dd_fwd:.2f}%")
     print(f"{'='*60}")
 
     # Save results log

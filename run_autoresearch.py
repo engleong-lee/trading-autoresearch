@@ -29,6 +29,7 @@ SEARCH_SPACE = {
     "SWING_TRAIL_PROFIT_PCT": [0.02, 0.03, 0.04, 0.05],
     "TREND_MIN_RR": [1.5, 2.0, 3.0, 4.0],
     "MAX_PER_SECTOR": [2, 3, 4, 5],
+    "MAX_NEW_POSITIONS_PER_DAY": [2, 3, 4, 5],
     "STOP_COOLDOWN_DAYS": [0, 1, 2, 3],
 }
 
@@ -65,7 +66,7 @@ def set_param_value(content, param, value):
 
 
 def evaluate():
-    """Run prepare.py (val) and test_forward.py (2026 OOS); return (val, forward, score)."""
+    """Run prepare.py (val), prepare.py --test (2024-25), and test_forward.py (2026); return scores."""
     res1 = subprocess.run(
         [sys.executable, "prepare.py"],
         capture_output=True, text=True, timeout=300,
@@ -76,21 +77,30 @@ def evaluate():
     val = float(m1.group(1)) if m1 else -999.0
 
     res2 = subprocess.run(
+        [sys.executable, "prepare.py", "--test"],
+        capture_output=True, text=True, timeout=300,
+        cwd=str(STRATEGY_FILE.parent),
+    )
+    output2 = res2.stdout + res2.stderr
+    m2 = re.search(r'\[TEST\].*?Sharpe Ratio:\s+([-\d.]+)', output2, re.DOTALL)
+    test = float(m2.group(1)) if m2 else -999.0
+
+    res3 = subprocess.run(
         [sys.executable, "test_forward.py"],
         capture_output=True, text=True, timeout=120,
         cwd=str(STRATEGY_FILE.parent),
     )
-    output2 = res2.stdout + res2.stderr
-    m2 = re.search(r'sharpe_ratio:\s*([-\d.]+)', output2)
-    fwd = float(m2.group(1)) if m2 else -999.0
+    output3 = res3.stdout + res3.stderr
+    m3 = re.search(r'sharpe_ratio:\s*([-\d.]+)', output3)
+    fwd = float(m3.group(1)) if m3 else -999.0
 
-    if val == -999.0 or fwd == -999.0:
-        print(f"  EVAL FAILED: val={val} forward={fwd}")
-        return -999.0, -999.0, -999.0
+    if val == -999.0 or test == -999.0 or fwd == -999.0:
+        print(f"  EVAL FAILED: val={val} test={test} forward={fwd}")
+        return -999.0, -999.0, -999.0, -999.0
 
-    # Optimize for the worst case between validation and forward OOS
-    score = min(val, fwd)
-    return val, fwd, score
+    # Optimize for the worst case across all three OOS slices
+    score = min(val, test, fwd)
+    return val, test, fwd, score
 
 
 def main():
@@ -98,9 +108,9 @@ def main():
     best_content = read_strategy()
     shutil.copy2(STRATEGY_FILE, BEST_BACKUP)
 
-    best_val, best_fwd, best_score = evaluate()
+    best_val, best_test, best_fwd, best_score = evaluate()
     print(f"\n{'='*60}")
-    print(f"BASELINE score={best_score:.4f} (val={best_val:.4f}, forward={best_fwd:.4f})")
+    print(f"BASELINE score={best_score:.4f} (val={best_val:.4f}, test={best_test:.4f}, fwd={best_fwd:.4f})")
     print(f"{'='*60}\n")
 
     results_log = []
@@ -123,18 +133,19 @@ def main():
         # Apply and evaluate
         write_strategy(content)
         t0 = time.time()
-        val, fwd, score = evaluate()
+        val, test, fwd, score = evaluate()
         elapsed = time.time() - t0
 
         improved = score > best_score
         status = "IMPROVED" if improved else "no improvement"
 
         change_str = ", ".join(f"{k}: {v[0]}→{v[1]}" for k, v in changes.items())
-        print(f"[{exp}/{NUM_EXPERIMENTS}] score={score:.4f} (val={val:.4f}, fwd={fwd:.4f}) [{status}] [{elapsed:.0f}s] | {change_str}")
+        print(f"[{exp}/{NUM_EXPERIMENTS}] score={score:.4f} (val={val:.4f}, test={test:.4f}, fwd={fwd:.4f}) [{status}] [{elapsed:.0f}s] | {change_str}")
 
         results_log.append({
             "exp": exp,
             "val": val,
+            "test": test,
             "forward": fwd,
             "score": score,
             "improved": improved,
@@ -145,11 +156,12 @@ def main():
         if improved:
             best_score = score
             best_val = val
+            best_test = test
             best_fwd = fwd
             best_content = content
             shutil.copy2(STRATEGY_FILE, BEST_BACKUP)
             improvements += 1
-            print(f"  >>> NEW BEST: score={best_score:.4f} val={best_val:.4f} forward={best_fwd:.4f}")
+            print(f"  >>> NEW BEST: score={best_score:.4f} val={best_val:.4f} test={best_test:.4f} fwd={best_fwd:.4f}")
         else:
             # Revert to best
             write_strategy(best_content)
@@ -161,6 +173,7 @@ def main():
     print(f"  Improvements: {improvements}")
     print(f"  Best score:   {best_score:.4f}")
     print(f"  Best val:     {best_val:.4f}")
+    print(f"  Best test:    {best_test:.4f}")
     print(f"  Best forward: {best_fwd:.4f}")
     print(f"{'='*60}")
 

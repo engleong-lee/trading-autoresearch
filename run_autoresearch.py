@@ -27,6 +27,7 @@ SEARCH_SPACE = {
     "SWING_MAX_HOLD_DAYS": [5, 7, 10, 14, 21],
     "SWING_MIN_RR": [1.5, 2.0, 2.5, 3.0],
     "SWING_TRAIL_PROFIT_PCT": [0.02, 0.03, 0.04, 0.05],
+    "TREND_MIN_RR": [1.5, 2.0, 3.0, 4.0],
     "MAX_PER_SECTOR": [2, 3, 4, 5],
     "STOP_COOLDOWN_DAYS": [0, 1, 2, 3],
 }
@@ -87,7 +88,8 @@ def evaluate():
         print(f"  EVAL FAILED: val={val} forward={fwd}")
         return -999.0, -999.0, -999.0
 
-    score = 0.5 * val + 0.5 * fwd
+    # Optimize for the worst case between validation and forward OOS
+    score = min(val, fwd)
     return val, fwd, score
 
 

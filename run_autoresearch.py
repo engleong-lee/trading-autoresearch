@@ -13,22 +13,24 @@ NUM_EXPERIMENTS = int(sys.argv[1]) if len(sys.argv) > 1 else 50
 
 # Parameter search space: (param_name, [values])
 SEARCH_SPACE = {
+    "SR_LOOKBACK": [40, 50, 60, 75, 90],
+    "SWING_TRAIL_ATR_MULT": [0.5, 0.6, 0.8, 1.0, 1.2],
+    "ATR_STOP_MULTIPLIER": [0.5, 0.6, 0.7, 0.8, 1.0],
+    "PULLBACK_THRESHOLD_PCT": [0.01, 0.02, 0.03, 0.04],
     "EMA_FAST": [10, 12, 15],
     "EMA_MID": [20, 21, 25],
-    "ATR_STOP_MULTIPLIER": [1.0, 1.5, 2.0, 2.5],
-    "DONCHIAN_LOOKBACK": [10, 15, 20, 25],
-    "VOL_RATIO_MIN": [0.5, 1.0, 1.5],
-    "RSI_OVERBOUGHT": [65, 70, 75, 80],
-    "ADX_MIN": [15, 20, 25],
-    "SWING_MIN_RR": [1.5, 2.0, 2.5],
-    "SWING_MAX_HOLD_DAYS": [5, 7, 10, 14, 21],
-    "SWING_TRAIL_PROFIT_PCT": [0.02, 0.03, 0.05, 0.07],
-    "SWING_TRAIL_ATR_MULT": [1.0, 1.5, 2.0, 2.5],
+    "TP_OFFSET_PCT": [0.002, 0.003, 0.004, 0.005, 0.006],
+    "ENTRY_OFFSET_PCT": [0.001, 0.002, 0.003],
+    "VOL_RATIO_MIN": [0.2, 0.3, 0.5],
     "RISK_PCT": [0.005, 0.007, 0.01, 0.012],
-    "MAX_POSITION_SHARES": [200, 400, 600, 800],
-    "MAX_PER_SECTOR": [2, 3, 4],
+    "MAX_POSITION_SHARES": [400, 600, 800, 1000],
+    "SWING_MAX_HOLD_DAYS": [5, 7, 10, 14, 21],
+    "SWING_MIN_RR": [1.5, 2.0, 2.5, 3.0],
+    "SWING_TRAIL_PROFIT_PCT": [0.02, 0.03, 0.04, 0.05],
+    "TREND_MIN_RR": [1.5, 2.0, 3.0, 4.0],
+    "MAX_PER_SECTOR": [2, 3, 4, 5],
     "MAX_NEW_POSITIONS_PER_DAY": [2, 3, 4, 5],
-    "VIX_HIGH_THRESHOLD": [25, 30, 35],
+    "STOP_COOLDOWN_DAYS": [0, 1, 2, 3],
 }
 
 # How many params to vary per experiment (1-4)

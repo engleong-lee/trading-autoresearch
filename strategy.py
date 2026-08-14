@@ -25,8 +25,8 @@ import pandas as pd
 # ─────────────────────────────────────────────────────────────
 
 # EMA periods (from the original strategy: 20, 50, 200)
-EMA_FAST = 12
-EMA_MID = 21
+EMA_FAST = 10
+EMA_MID = 20
 EMA_SLOW = 200
 
 # ATR for stop-loss calculation
@@ -35,7 +35,7 @@ ATR_STOP_MULTIPLIER = 0.8   # Stop = support - ATR * multiplier
 
 # Swing trading parameters
 SWING_MIN_RR = 1.5           # Minimum reward/risk ratio for swing entries
-SWING_MAX_HOLD_DAYS = 7     # Max hold days for swing trades
+SWING_MAX_HOLD_DAYS = 5     # Max hold days for swing trades
 SWING_TRAIL_PROFIT_PCT = 0.02  # Activate trailing stop after this profit %
 SWING_TRAIL_ATR_MULT = 1.0    # Trailing stop distance in ATR units
 
@@ -47,7 +47,7 @@ TREND_TRAIL_ATR_MULT = 1.5   # Trail stop at N * ATR below recent support
 ENTRY_OFFSET_PCT = 0.001
 
 # Take-profit offset from resistance (0.3% below resistance)
-TP_OFFSET_PCT = 0.005
+TP_OFFSET_PCT = 0.006
 
 # Risk per trade
 RISK_PCT = 0.01  # 0.5% of capital
@@ -92,10 +92,10 @@ SECTOR_MAP = {
     "AMZN": "XLY",
     "VGK": None,
 }
-MAX_PER_SECTOR = 5            # Max concurrent positions in same sector
+MAX_PER_SECTOR = 3            # Max concurrent positions in same sector
 
 # Stop-loss cooldown
-STOP_COOLDOWN_DAYS = 0        # Skip re-entry for N days after stop-out (0=disabled)
+STOP_COOLDOWN_DAYS = 3        # Skip re-entry for N days after stop-out (0=disabled)
 
 
 # ─────────────────────────────────────────────────────────────

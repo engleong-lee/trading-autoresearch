@@ -605,6 +605,20 @@ def generate_signals(data, start_date, end_date):
             if not entry_found:
                 continue
 
+            # Adjust entry to the worst realistic fill inside today's bar
+            entry_price = max(entry_price, current["Low"])
+            entry_price = min(entry_price, current["High"])
+
+            # Recompute risk/reward with the adjusted fill
+            risk = entry_price - stop_loss
+            reward = take_profit - entry_price
+            if risk <= 0:
+                continue
+            rr_ratio = reward / risk
+            if (strategy_type == "trend" and rr_ratio < TREND_MIN_RR) or \
+               (strategy_type != "trend" and rr_ratio < SWING_MIN_RR):
+                continue
+
             # Position sizing: risk-adjust based on VIX
             effective_risk = RISK_PCT * 1.3 if vix < VIX_LOW_THRESHOLD else RISK_PCT
             risk_amount = capital * effective_risk

@@ -40,7 +40,7 @@ SWING_TRAIL_PROFIT_PCT = 0.04  # Activate trailing stop after this profit %
 SWING_TRAIL_ATR_MULT = 0.5    # Trailing stop distance in ATR units
 
 # Trend trading parameters
-TREND_MIN_RR = 3.0           # Minimum reward/risk for trend initial entry
+TREND_MIN_RR = 4.0           # Minimum reward/risk for trend initial entry
 TREND_TRAIL_ATR_MULT = 1.5   # Trail stop at N * ATR below recent support
 
 # Entry offset from support (0.3% above support)
@@ -50,7 +50,7 @@ ENTRY_OFFSET_PCT = 0.001
 TP_OFFSET_PCT = 0.005
 
 # Risk per trade
-RISK_PCT = 0.01  # 0.5% of capital
+RISK_PCT = 0.012  # 0.5% of capital
 MAX_POSITION_SHARES = 600    # Cap shares per trade
 
 # Market regime filter

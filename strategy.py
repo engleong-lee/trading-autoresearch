@@ -34,13 +34,13 @@ ATR_PERIOD = 14
 ATR_STOP_MULTIPLIER = 1.0   # Stop = support - ATR * multiplier
 
 # Swing trading parameters
-SWING_MIN_RR = 1.0           # Minimum reward/risk ratio for swing entries
-SWING_MAX_HOLD_DAYS = 1     # Max hold days for swing trades
+SWING_MIN_RR = 1.5           # Minimum reward/risk ratio for swing entries
+SWING_MAX_HOLD_DAYS = 10     # Max hold days for swing trades
 SWING_TRAIL_PROFIT_PCT = 0.03  # Activate trailing stop after this profit %
 SWING_TRAIL_ATR_MULT = 0.8    # Trailing stop distance in ATR units
 
 # Trend trading parameters
-TREND_MIN_RR = 6.0           # Minimum reward/risk for trend initial entry
+TREND_MIN_RR = 3.0           # Minimum reward/risk for trend initial entry
 TREND_TRAIL_ATR_MULT = 1.5   # Trail stop at N * ATR below recent support
 
 # Entry offset from support (0.3% above support)
@@ -65,7 +65,7 @@ SR_LOOKBACK = 60             # Days to look back for S/R levels
 SR_MIN_TOUCHES = 2           # Minimum touches to qualify as S/R
 
 # Pattern detection
-PULLBACK_THRESHOLD_PCT = 0.07  # Price within 7% of support = potential entry
+PULLBACK_THRESHOLD_PCT = 0.04  # Price within 4% of support = potential entry
 
 # Candlestick confirmation
 CANDLE_CONFIRM_VIX = 25      # Require candle confirmation when VIX above this

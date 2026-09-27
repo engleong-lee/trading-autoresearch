@@ -254,6 +254,80 @@ def stats(trips):
                 by_reason={k: {"n": v[0], "pnl": v[1]} for k, v in by_reason.items()})
 
 
+GTC_CHANGE_DATE = "2026-08-08"  # date the DAY->GTC order TIF fix went live
+
+
+def scorecard(conn, since=GTC_CHANGE_DATE):
+    """Cumulative performance scorecard from `since` (YYYY-MM-DD) to date, using
+    only the Postgres order history (no network). Returns a dict, or {} if empty."""
+    from datetime import date as _date
+    sd = _date.fromisoformat(since) if isinstance(since, str) else since
+
+    # entry fill rate
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT status, count(*) FROM {db._q('autoresearch_trade_history')} "
+            f"WHERE side='buy' AND (leg_role='entry' OR parent_order_id IS NULL) "
+            f"AND submitted_at::date >= %s GROUP BY status", (sd,))
+        ent = dict(cur.fetchall())
+    entries_total = sum(ent.values())
+    entries_filled = ent.get("filled", 0)
+
+    # closed round-trips exiting on/after `since`
+    all_filled = db.get_all_filled_orders(conn)
+    trips, _ = reconstruct_trips(all_filled)
+    cl = [t for t in trips if t["exit_at"] and t["exit_at"].date() >= sd]
+    st = stats(cl)
+    if not st:
+        return dict(since=str(sd), entries_total=entries_total,
+                    entries_filled=entries_filled, n=0)
+    wins = [t for t in cl if t["pnl"] > 0]
+    losses = [t for t in cl if t["pnl"] <= 0]
+    gross_w = sum(t["pnl"] for t in wins)
+    gross_l = sum(t["pnl"] for t in losses)
+    bw = max(cl, key=lambda t: t["pnl"])
+    bl = min(cl, key=lambda t: t["pnl"])
+    holds = [t["hold_days"] for t in cl if t["hold_days"] is not None]
+    return dict(
+        since=str(sd), entries_total=entries_total, entries_filled=entries_filled,
+        n=st["n"], total=st["total"], wins=len(wins), losses=len(losses),
+        win_rate=st["win_rate"], avg_win=st["avg_win"], avg_loss=st["avg_loss"],
+        expectancy=st["expectancy"],
+        profit_factor=(gross_w / abs(gross_l)) if gross_l else float("inf"),
+        big_win=(bw["symbol"], bw["pnl"], bw["pct"]),
+        big_loss=(bl["symbol"], bl["pnl"], bl["pct"]),
+        avg_hold=(sum(holds) / len(holds)) if holds else None,
+        by_reason=st["by_reason"],
+    )
+
+
+def render_scorecard(sc):
+    """Markdown for the weekly Telegram scorecard section."""
+    since = sc.get("since")
+    et, ef = sc.get("entries_total", 0), sc.get("entries_filled", 0)
+    fr = (100 * ef / et) if et else 0
+    lines = [f"## 📊 Performance Scorecard (since GTC change {since})"]
+    lines.append(f"- Entry fill rate: {ef}/{et} = {fr:.0f}%")
+    if not sc.get("n"):
+        lines.append("- No closed trades yet in this period.")
+        return "\n".join(lines)
+    pf = sc["profit_factor"]
+    pf_s = "∞" if pf == float("inf") else f"{pf:.2f}"
+    bw, bl = sc["big_win"], sc["big_loss"]
+    lines += [
+        f"- Closed trades: {sc['n']} — {sc['wins']}W / {sc['losses']}L ({sc['win_rate']:.0f}% win)",
+        f"- Net realized P&L: ${sc['total']:,.2f} • Profit factor: {pf_s}",
+        f"- Avg win ${sc['avg_win']:,.0f} • Avg loss ${sc['avg_loss']:,.0f} • Expectancy ${sc['expectancy']:,.0f}/trade",
+        f"- Biggest gain: {bw[0]} +${bw[1]:,.0f} ({bw[2]:+.1f}%) • Biggest loss: {bl[0]} ${bl[1]:,.0f} ({bl[2]:+.1f}%)",
+    ]
+    if sc.get("avg_hold") is not None:
+        lines.append(f"- Avg hold: {sc['avg_hold']:.1f} days")
+    if sc.get("by_reason"):
+        parts = [f"{k}: {v['n']} (${v['pnl']:,.0f})" for k, v in sc["by_reason"].items()]
+        lines.append("- Exits by reason: " + " • ".join(parts))
+    return "\n".join(lines)
+
+
 # ─────────────────────────────────────────────────────────────
 # REPORT (markdown, reused by weekly summary)
 # ─────────────────────────────────────────────────────────────

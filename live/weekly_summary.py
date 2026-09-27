@@ -135,6 +135,13 @@ def run():
     except Exception as e:
         log.warning("Closed-trade section failed: %s", e)
 
+    # Cumulative performance scorecard since the GTC TIF change (DB-only, robust).
+    try:
+        sc = trade_history.scorecard(conn)
+        summary = summary + "\n\n" + trade_history.render_scorecard(sc)
+    except Exception as e:
+        log.warning("Scorecard section failed: %s", e)
+
     db.insert_weekly_summary(conn, summary)
 
     try:

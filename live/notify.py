@@ -78,6 +78,14 @@ def broadcast(conn, text):
                         parse_mode="Markdown", disable_web_page_preview=True)
             if data and data.get("ok"):
                 continue
+            # 400 => Markdown parse failure (unbalanced entity in the report).
+            # Retry as plain text so the broadcast still gets delivered.
+            if data and data.get("error_code") == 400:
+                log.warning("Markdown parse failed for chat %s; retrying as plain text", cid)
+                data = _api("sendMessage", chat_id=cid, text=part,
+                            disable_web_page_preview=True)
+                if data and data.get("ok"):
+                    continue
             # 403 => user blocked the bot; deactivate
             if data and data.get("error_code") == 403:
                 db.deactivate_subscriber(conn, cid)
